@@ -20,6 +20,7 @@ interface UseImageStorageReturn {
   getImageById: (id: string) => StoredImage | undefined
   isUploading: boolean
   error: string | null
+  cleanup: () => void
 }
 
 export function useImageStorage(): UseImageStorageReturn {

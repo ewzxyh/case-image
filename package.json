@@ -7,8 +7,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
