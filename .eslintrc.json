@@ -1,0 +1,7 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "react/style-prop-object": "off",
+    "@next/next/no-css-in-js": "off"
+  }
+}

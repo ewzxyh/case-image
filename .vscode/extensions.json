@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "ms-vscode.vscode-typescript-next",
+    "bradlc.vscode-tailwindcss",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.vscode-json",
+    "formulahendry.auto-rename-tag",
+    "christian-kohler.path-intellisense",
+    "ms-vscode.vscode-css-intellisense",
+    "ms-vscode.vscode-html-css-support",
+    "bradlc.vscode-tailwindcss-intellisense",
+    "unifiedjs.vscode-mdx",
+    "ms-vscode.vscode-markdown-notebook"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.vscode-typescript",
+    "hookyqr.beautify"
+  ]
+}
