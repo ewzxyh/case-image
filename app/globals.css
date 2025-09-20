@@ -116,10 +116,78 @@
 }
 
 @layer base {
+  html,
+  body {
+    overflow: hidden;
+  }
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Editor Styles */
+.placeholder-overlay {
+  position: absolute;
+  border: 2px solid rgb(59 130 246);
+  background-color: rgb(59 130 246 / 0.1);
+}
+
+/* Canvas zoom styles */
+.canvas-container {
+  transform-origin: center center;
+}
+
+.canvas-container[data-zoom="0.25"] {
+  transform: scale(0.25);
+}
+.canvas-container[data-zoom="0.5"] {
+  transform: scale(0.5);
+}
+.canvas-container[data-zoom="0.75"] {
+  transform: scale(0.75);
+}
+.canvas-container[data-zoom="1"] {
+  transform: scale(1);
+}
+.canvas-container[data-zoom="1.25"] {
+  transform: scale(1.25);
+}
+.canvas-container[data-zoom="1.5"] {
+  transform: scale(1.5);
+}
+.canvas-container[data-zoom="2"] {
+  transform: scale(2);
+}
+.canvas-container[data-zoom="2.5"] {
+  transform: scale(2.5);
+}
+.canvas-container[data-zoom="3"] {
+  transform: scale(3);
+}
+
+/* Placeholder positioning styles */
+.placeholder-overlay {
+  position: absolute;
+  border: 2px solid rgb(59 130 246);
+  background-color: rgb(59 130 246 / 0.1);
+  left: attr(data-left px);
+  top: attr(data-top px);
+  width: attr(data-width px);
+  height: attr(data-height px);
+}
+
+/* Button cursor styles */
+button {
+  cursor: pointer;
+}
+
+.btn-clickable {
+  cursor: pointer;
+}
+
+.clickable {
+  cursor: pointer;
 }

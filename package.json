@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@neondatabase/serverless": "^1.0.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -66,6 +67,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@next/eslint-plugin-next": "^15.5.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

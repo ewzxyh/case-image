@@ -1,11 +1,188 @@
+"use client"
+
 import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileImage, Upload, Settings, Trash2, Edit } from "lucide-react"
+import { FileImage, Upload, Settings, Trash2, Edit, AlertCircle, Loader2 } from "lucide-react"
 import { ImageUpload } from "@/components/upload/image-upload"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "../../hooks/use-toast"
+
+interface Template {
+    id: string
+    name: string
+    description: string | null
+    image_url: string
+    lottery_type: string | null
+    status: string
+    usage_count: number
+    usage_today: number
+    current_avg_time: number | null
+    created_at: string
+}
+
+interface TemplatesData {
+    templates: Template[]
+    total: number
+    status: string
+}
 
 export default function TemplatesPage() {
+    const router = useRouter()
+    const { toast } = useToast()
+    const [templatesData, setTemplatesData] = useState<TemplatesData | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                const response = await fetch('/api/templates')
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar templates')
+                }
+                const data = await response.json()
+                setTemplatesData(data)
+            } catch (err) {
+                console.error('Erro ao buscar templates:', err)
+                setError(err instanceof Error ? err.message : 'Erro desconhecido')
+
+                // Fallback para dados mockados
+                setTemplatesData({
+                    templates: [
+                        {
+                            id: '550e8400-e29b-41d4-a716-446655440001',
+                            name: 'Mega-Sena Principal',
+                            description: 'Template principal para resultados da Mega-Sena',
+                            image_url: '/megasena-template.png',
+                            lottery_type: 'mega-sena',
+                            status: 'active',
+                            usage_count: 1247,
+                            usage_today: 15,
+                            current_avg_time: 2.3,
+                            created_at: new Date().toISOString()
+                        },
+                        {
+                            id: '550e8400-e29b-41d4-a716-446655440002',
+                            name: 'Lotofácil Resultados',
+                            description: 'Template para sorteios da Lotofácil',
+                            image_url: '/lotofacil-template.png',
+                            lottery_type: 'lotofacil',
+                            status: 'inactive',
+                            usage_count: 856,
+                            usage_today: 8,
+                            current_avg_time: 1.8,
+                            created_at: new Date().toISOString()
+                        },
+                        {
+                            id: '550e8400-e29b-41d4-a716-446655440003',
+                            name: 'Mega-Sena Clássico',
+                            description: 'Versão clássica do template Mega-Sena com design limpo',
+                            image_url: '/megasena-template.png',
+                            lottery_type: 'mega-sena',
+                            status: 'active',
+                            usage_count: 0,
+                            usage_today: 0,
+                            current_avg_time: null,
+                            created_at: new Date().toISOString()
+                        }
+                    ],
+                    total: 3,
+                    status: 'active'
+                })
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchTemplates()
+    }, [])
+
+    const templates = templatesData?.templates || []
+    const totalTemplates = templatesData?.total || 0
+
+    const handleEditTemplate = (template: Template) => {
+        router.push(`/editor?template=${template.id}`)
+    }
+
+    const handleDeleteTemplate = async (templateId: string) => {
+        try {
+            const response = await fetch(`/api/templates/${templateId}`, {
+                method: 'DELETE',
+            })
+
+            if (!response.ok) {
+                throw new Error('Erro ao excluir template')
+            }
+
+            // Atualizar lista de templates
+            setTemplatesData(prev => prev ? {
+                ...prev,
+                templates: prev.templates.filter(t => t.id !== templateId),
+                total: prev.total - 1
+            } : null)
+
+            toast({
+                title: "Template excluído",
+                description: "O template foi removido com sucesso.",
+            })
+        } catch {
+            toast({
+                title: "Erro ao excluir",
+                description: "Não foi possível excluir o template.",
+                variant: "destructive"
+            })
+        }
+    }
+
+    const handleUpdateTemplate = async (templateId: string, updates: Partial<Template>) => {
+        try {
+            const response = await fetch(`/api/templates/${templateId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(updates),
+            })
+
+            if (!response.ok) {
+                throw new Error('Erro ao atualizar template')
+            }
+
+            const data = await response.json()
+
+            // Atualizar template na lista
+            setTemplatesData(prev => prev ? {
+                ...prev,
+                templates: prev.templates.map(t =>
+                    t.id === templateId ? { ...t, ...data.template } : t
+                )
+            } : null)
+
+            toast({
+                title: "Template atualizado",
+                description: "As configurações foram salvas com sucesso.",
+            })
+
+            setSelectedTemplate(null)
+        } catch {
+            toast({
+                title: "Erro ao atualizar",
+                description: "Não foi possível salvar as configurações.",
+                variant: "destructive"
+            })
+        }
+    }
+
     return (
         <div className="flex-1 space-y-6">
             {/* Header da Página */}
@@ -18,8 +195,20 @@ export default function TemplatesPage() {
                 </div>
                 <div className="flex items-center space-x-2">
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-                        3 Templates
+                        {totalTemplates} Template{totalTemplates !== 1 ? 's' : ''}
                     </Badge>
+                    {loading && (
+                        <Badge variant="outline" className="animate-pulse">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Carregando...
+                        </Badge>
+                    )}
+                    {error && (
+                        <Badge variant="destructive">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Erro na conexão
+                        </Badge>
+                    )}
                 </div>
             </div>
 
@@ -42,153 +231,173 @@ export default function TemplatesPage() {
 
             {/* Lista de Templates */}
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-                {/* Template de Exemplo 1 */}
-                <Card className="group hover:shadow-lg transition-all duration-200">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Mega-Sena Principal</CardTitle>
-                            <Badge variant="secondary">Ativo</Badge>
-                        </div>
-                        <CardDescription>
-                            Template principal para resultados da Mega-Sena
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Preview do Template */}
-                        <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                            <Image
-                                src="/megasena-template.png"
-                                alt="Preview do template Mega-Sena"
-                                width={400}
-                                height={225}
-                                className="w-full h-full object-cover"
-                                priority
-                            />
-                        </div>
-
-                        {/* Estatísticas */}
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="text-center">
-                                <p className="font-medium text-lg">1,247</p>
-                                <p className="text-muted-foreground">Usos</p>
+                {templates.map((template) => (
+                    <Card key={template.id} className="group hover:shadow-lg transition-all duration-200">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">{template.name}</CardTitle>
+                                <Badge
+                                    variant={template.status === 'active' ? 'secondary' : 'outline'}
+                                    className={
+                                        template.status === 'active'
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                            : template.status === 'draft'
+                                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
+                                                : ''
+                                    }
+                                >
+                                    {template.status === 'active' ? 'Ativo' :
+                                        template.status === 'inactive' ? 'Inativo' :
+                                            template.status === 'draft' ? 'Rascunho' : template.status}
+                                </Badge>
                             </div>
-                            <div className="text-center">
-                                <p className="font-medium text-lg">2.3s</p>
-                                <p className="text-muted-foreground">Tempo Médio</p>
+                            <CardDescription>
+                                {template.description || 'Sem descrição disponível'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Preview do Template */}
+                            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                                {template.image_url ? (
+                                    <Image
+                                        src={template.image_url}
+                                        alt={`Preview do template ${template.name}`}
+                                        width={400}
+                                        height={225}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <FileImage className="h-8 w-8 text-muted-foreground" />
+                                    </div>
+                                )}
                             </div>
-                        </div>
 
-                        {/* Ações */}
-                        <div className="flex gap-2">
-                            <Button size="sm" className="flex-1">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Settings className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Template de Exemplo 2 */}
-                <Card className="group hover:shadow-lg transition-all duration-200">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Lotofácil Resultados</CardTitle>
-                            <Badge variant="outline">Inativo</Badge>
-                        </div>
-                        <CardDescription>
-                            Template para sorteios da Lotofácil
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="aspect-video bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg flex items-center justify-center border-2 border-blue-200 dark:border-blue-800">
-                            <div className="text-center">
-                                <div className="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mb-3 mx-auto">
-                                    <span className="text-white font-bold text-xl">LF</span>
+                            {/* Estatísticas */}
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="text-center">
+                                    <p className="font-medium text-lg">{template.usage_count.toLocaleString()}</p>
+                                    <p className="text-muted-foreground">Usos</p>
                                 </div>
-                                <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">Lotofácil</p>
-                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Template em desenvolvimento</p>
+                                <div className="text-center">
+                                    <p className="font-medium text-lg">
+                                        {template.current_avg_time && typeof template.current_avg_time === 'number'
+                                            ? `${template.current_avg_time.toFixed(1)}s`
+                                            : '--'}
+                                    </p>
+                                    <p className="text-muted-foreground">Tempo Médio</p>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="text-center">
-                                <p className="font-medium text-lg">856</p>
-                                <p className="text-muted-foreground">Usos</p>
+                            {/* Ações */}
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    className="flex-1 cursor-pointer"
+                                    onClick={() => handleEditTemplate(template)}
+                                >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    {template.status === 'active' ? 'Editar' : 'Visualizar'}
+                                </Button>
+
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="cursor-pointer"
+                                            onClick={() => setSelectedTemplate(template)}
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Configurações do Template</DialogTitle>
+                                            <DialogDescription>
+                                                Ajuste as configurações do template &ldquo;{selectedTemplate?.name}&rdquo;.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        {selectedTemplate && (
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label htmlFor="template-name">Nome</Label>
+                                                    <Input
+                                                        id="template-name"
+                                                        type="text"
+                                                        className="w-full mt-1"
+                                                        defaultValue={selectedTemplate.name}
+                                                        onChange={(e) => setSelectedTemplate(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="template-description">Descrição</Label>
+                                                    <Textarea
+                                                        id="template-description"
+                                                        className="w-full mt-1"
+                                                        rows={3}
+                                                        defaultValue={selectedTemplate.description || ''}
+                                                        onChange={(e) => setSelectedTemplate(prev => prev ? { ...prev, description: e.target.value } : null)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="template-status">Status</Label>
+                                                    <Select
+                                                        value={selectedTemplate.status}
+                                                        onValueChange={(value) => setSelectedTemplate(prev => prev ? { ...prev, status: value } : null)}
+                                                    >
+                                                        <SelectTrigger id="template-status">
+                                                            <SelectValue placeholder="Selecione o status" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="active">Ativo</SelectItem>
+                                                            <SelectItem value="inactive">Inativo</SelectItem>
+                                                            <SelectItem value="draft">Rascunho</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button
+                                                        onClick={() => handleUpdateTemplate(selectedTemplate.id, selectedTemplate)}
+                                                        disabled={!selectedTemplate.name.trim()}
+                                                    >
+                                                        Salvar Alterações
+                                                    </Button>
+                                                </DialogFooter>
+                                            </div>
+                                        )}
+                                    </DialogContent>
+                                </Dialog>
+
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button size="sm" variant="outline" className="cursor-pointer">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Excluir Template</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Tem certeza que deseja excluir o template &ldquo;{template.name}&rdquo;?
+                                                Esta ação não pode ser desfeita.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={() => handleDeleteTemplate(template.id)}
+                                                className="bg-red-600 hover:bg-red-700"
+                                            >
+                                                Excluir
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
-                            <div className="text-center">
-                                <p className="font-medium text-lg">1.8s</p>
-                                <p className="text-muted-foreground">Tempo Médio</p>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <Button size="sm" className="flex-1">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Settings className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Template Mega-Sena Clássico */}
-                <Card className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-2 hover:border-primary/20 h-full flex flex-col">
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Mega-Sena Clássico</CardTitle>
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Novo</Badge>
-                        </div>
-                        <CardDescription>
-                            Versão clássica do template Mega-Sena com design limpo
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="aspect-video bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg overflow-hidden border-2 border-green-200 dark:border-green-800">
-                            <Image
-                                src="/megasena-template.png"
-                                alt="Preview do template Mega-Sena Clássico"
-                                width={400}
-                                height={225}
-                                className="w-full h-full object-cover opacity-90"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="text-center">
-                                <p className="font-medium text-lg">0</p>
-                                <p className="text-muted-foreground">Usos</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="font-medium text-lg">--</p>
-                                <p className="text-muted-foreground">Tempo Médio</p>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <Button size="sm" className="flex-1">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Usar Template
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Settings className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                ))}
 
                 {/* Card para Criar Novo Template */}
                 <Card className="group hover:shadow-lg transition-all duration-200 border-dashed border-2 hover:border-primary/50 xl:col-span-1">
@@ -200,7 +409,10 @@ export default function TemplatesPage() {
                         <p className="text-muted-foreground text-sm mb-4">
                             Comece do zero ou use um template existente como base
                         </p>
-                        <Button className="w-full">
+                        <Button
+                            className="w-full cursor-pointer"
+                            onClick={() => router.push('/editor')}
+                        >
                             <Upload className="h-4 w-4 mr-2" />
                             Criar Template
                         </Button>

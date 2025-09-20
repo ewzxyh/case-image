@@ -1,9 +1,78 @@
+"use client"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileImage, Edit, GalleryHorizontalEnd, Clock, Users } from "lucide-react"
+import { FileImage, Edit, GalleryHorizontalEnd, Clock, Users, AlertCircle } from "lucide-react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+
+interface DashboardData {
+  stats: {
+    totalTemplates: number
+    imagesGenerated: number
+    averageTime: number
+    activeUsers: number
+  }
+  recentTemplates: Array<{
+    id: string
+    name: string
+    usage_today: number
+    current_avg_time: number
+    created_at: string
+  }>
+  recentActivities: Array<{
+    id: string
+    template_name: string
+    created_at: string
+    action: string
+  }>
+}
 
 export default function Home() {
+  const router = useRouter()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await fetch('/api/dashboard')
+        if (!response.ok) {
+          throw new Error('Erro ao carregar dados do dashboard')
+        }
+        const data = await response.json()
+        setDashboardData(data)
+      } catch (err) {
+        console.error('Erro ao buscar dados do dashboard:', err)
+        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+
+        // Fallback para dados mockados
+        setDashboardData({
+          stats: {
+            totalTemplates: 3,
+            imagesGenerated: 1247,
+            averageTime: 2.3,
+            activeUsers: 573
+          },
+          recentTemplates: [],
+          recentActivities: []
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [])
+
+  const stats = dashboardData?.stats || {
+    totalTemplates: 3,
+    imagesGenerated: 1247,
+    averageTime: 2.3,
+    activeUsers: 573
+  }
   return (
     <div className="flex-1 space-y-4">
       {/* Header da Dashboard */}
@@ -18,6 +87,17 @@ export default function Home() {
           <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
             Sistema Online
           </Badge>
+          {loading && (
+            <Badge variant="outline" className="animate-pulse">
+              Carregando...
+            </Badge>
+          )}
+          {error && (
+            <Badge variant="destructive">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Erro na conexão
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -29,9 +109,9 @@ export default function Home() {
             <FileImage className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
+            <div className="text-2xl font-bold">{stats.totalTemplates}</div>
             <p className="text-xs text-muted-foreground">
-              +2 desde ontem
+              Templates criados
             </p>
           </CardContent>
         </Card>
@@ -42,9 +122,9 @@ export default function Home() {
             <GalleryHorizontalEnd className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
+            <div className="text-2xl font-bold">{stats.imagesGenerated.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              +15% em relação ao mês passado
+              Imagens geradas (30 dias)
             </p>
           </CardContent>
         </Card>
@@ -55,9 +135,9 @@ export default function Home() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2.3s</div>
+            <div className="text-2xl font-bold">{stats.averageTime.toFixed(1)}s</div>
             <p className="text-xs text-muted-foreground">
-              -0.2s desde a última semana
+              Tempo médio de geração
             </p>
           </CardContent>
         </Card>
@@ -68,9 +148,9 @@ export default function Home() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">573</div>
+            <div className="text-2xl font-bold">{stats.activeUsers}</div>
             <p className="text-xs text-muted-foreground">
-              +12% em relação ao mês passado
+              Usuários ativos (7 dias)
             </p>
           </CardContent>
         </Card>
@@ -91,7 +171,10 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <Button className="w-full h-11 font-medium">
+            <Button
+              className="w-full h-11 font-medium cursor-pointer"
+              onClick={() => router.push('/editor')}
+            >
               Começar
             </Button>
           </CardContent>
@@ -110,7 +193,11 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <Button variant="outline" className="w-full h-11 font-medium border-2">
+            <Button
+              variant="outline"
+              className="w-full h-11 font-medium border-2 cursor-pointer"
+              onClick={() => router.push('/templates')}
+            >
               Abrir Editor
             </Button>
           </CardContent>
@@ -129,7 +216,11 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-4">
-            <Button variant="outline" className="w-full h-11 font-medium border-2">
+            <Button
+              variant="outline"
+              className="w-full h-11 font-medium border-2 cursor-pointer"
+              onClick={() => router.push('/galeria')}
+            >
               Explorar
             </Button>
           </CardContent>
@@ -146,27 +237,45 @@ export default function Home() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Template &ldquo;Loterias Caixa&rdquo; criado</p>
-                <p className="text-xs text-muted-foreground">2 minutos atrás</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">15 imagens geradas automaticamente</p>
-                <p className="text-xs text-muted-foreground">1 hora atrás</p>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <div className="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Template &ldquo;Lotofácil&rdquo; atualizado</p>
-                <p className="text-xs text-muted-foreground">3 horas atrás</p>
-              </div>
-            </div>
+            {dashboardData?.recentActivities && dashboardData.recentActivities.length > 0 ? (
+              dashboardData.recentActivities.slice(0, 5).map((activity, index) => (
+                <div key={activity.id} className="flex items-center">
+                  <div className={`w-2 h-2 rounded-full mr-3 ${index % 3 === 0 ? 'bg-green-500' :
+                    index % 3 === 1 ? 'bg-blue-500' : 'bg-orange-500'
+                    }`}></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.template_name} - {activity.action}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(activity.created_at).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Template &ldquo;Loterias Caixa&rdquo; criado</p>
+                    <p className="text-xs text-muted-foreground">2 minutos atrás</p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">15 imagens geradas automaticamente</p>
+                    <p className="text-xs text-muted-foreground">1 hora atrás</p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-3"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Template &ldquo;Lotofácil&rdquo; atualizado</p>
+                    <p className="text-xs text-muted-foreground">3 horas atrás</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
