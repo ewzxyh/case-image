@@ -96,7 +96,7 @@ export async function PUT(
         name = ${body.name || 'Template'},
         description = ${body.description || null},
         lottery_type = ${body.lottery_type || 'mega-sena'},
-        status = ${body.status || 'draft'},
+        status = ${body.status || 'active'},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${templateId}
       RETURNING *

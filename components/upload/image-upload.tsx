@@ -2,14 +2,20 @@
 
 import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
-import { Upload, X, AlertCircle, CheckCircle } from "lucide-react"
+import { Upload, X, AlertCircle, CheckCircle, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import Image from "next/image"
+import { useToast } from "@/hooks/use-toast"
 
 interface ImageUploadProps {
   onImageSelect?: (file: File) => void
+  onTemplateCreated?: () => void // Callback para quando um template for criado
   maxSize?: number // em bytes
   acceptedTypes?: string[]
   className?: string
@@ -17,16 +23,24 @@ interface ImageUploadProps {
 
 export function ImageUpload({
   onImageSelect,
+  onTemplateCreated,
   maxSize = 10 * 1024 * 1024, // 10MB
   acceptedTypes = ["image/png", "image/jpeg", "image/jpg"],
   className = ""
 }: ImageUploadProps) {
+  const { toast } = useToast()
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  // Campos do formulário
+  const [templateName, setTemplateName] = useState("")
+  const [templateDescription, setTemplateDescription] = useState("")
+  const [lotteryType, setLotteryType] = useState("")
+  const [showForm, setShowForm] = useState(false)
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -48,6 +62,7 @@ export function ImageUpload({
       setError(null)
       setUploadedFile(file)
       setSuccess(false)
+      setShowForm(true)
 
       // Criar preview
       const reader = new FileReader()
@@ -56,22 +71,7 @@ export function ImageUpload({
       }
       reader.readAsDataURL(file)
 
-      // Simular upload progress
-      setIsUploading(true)
-      setUploadProgress(0)
-
-      const interval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(interval)
-            setIsUploading(false)
-            setSuccess(true)
-            onImageSelect?.(file)
-            return 100
-          }
-          return prev + 10
-        })
-      }, 100)
+      onImageSelect?.(file)
     },
     [acceptedTypes, maxSize, onImageSelect]
   )
@@ -92,6 +92,70 @@ export function ImageUpload({
     setUploadProgress(0)
     setError(null)
     setSuccess(false)
+    setShowForm(false)
+    setTemplateName("")
+    setTemplateDescription("")
+    setLotteryType("")
+  }
+
+  const createTemplate = async () => {
+    if (!uploadedFile || !templateName.trim()) {
+      setError("Nome do template é obrigatório")
+      return
+    }
+
+    setIsUploading(true)
+    setError(null)
+    setUploadProgress(0)
+
+    try {
+      // Criar FormData para enviar arquivo e dados
+      const formData = new FormData()
+      formData.append('image', uploadedFile)
+      formData.append('name', templateName.trim())
+      formData.append('description', templateDescription.trim())
+      formData.append('lottery_type', lotteryType)
+
+      // Simular progresso de upload
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 15, 90))
+      }, 200)
+
+      // Fazer upload para API
+      const response = await fetch('/api/templates', {
+        method: 'POST',
+        body: formData,
+      })
+
+      clearInterval(progressInterval)
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Erro ao criar template')
+      }
+
+      await response.json()
+      setUploadProgress(100)
+      setSuccess(true)
+
+      toast({
+        title: "Template criado com sucesso!",
+        description: `O template "${templateName}" foi salvo e está disponível na lista.`,
+      })
+
+      // Limpar formulário
+      removeFile()
+
+      // Chamar callback para atualizar lista
+      onTemplateCreated?.()
+
+    } catch (err) {
+      console.error('Erro ao criar template:', err)
+      setError(err instanceof Error ? err.message : 'Erro ao criar template')
+      setUploadProgress(0)
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -175,19 +239,108 @@ export function ImageUpload({
         </div>
       )}
 
+      {/* Formulário de Criação do Template */}
+      {showForm && uploadedFile && (
+        <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+          <h3 className="font-semibold text-lg">Configurar Template</h3>
+
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="template-name">Nome do Template *</Label>
+              <Input
+                id="template-name"
+                type="text"
+                placeholder="Ex: Mega-Sena Principal"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="template-description">Descrição (opcional)</Label>
+              <Textarea
+                id="template-description"
+                placeholder="Descrição do template..."
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                rows={2}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="lottery-type">Tipo de Loteria</Label>
+              <Select value={lotteryType} onValueChange={setLotteryType}>
+                <SelectTrigger id="lottery-type" className="mt-1">
+                  <SelectValue placeholder="Selecione o tipo de loteria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mega-sena">Mega-Sena</SelectItem>
+                  <SelectItem value="lotofacil">Lotofácil</SelectItem>
+                  <SelectItem value="quina">Quina</SelectItem>
+                  <SelectItem value="lotomania">Lotomania</SelectItem>
+                  <SelectItem value="timemania">Timemania</SelectItem>
+                  <SelectItem value="dupla-sena">Dupla Sena</SelectItem>
+                  <SelectItem value="dia-de-sorte">Dia de Sorte</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              onClick={createTemplate}
+              disabled={isUploading || !templateName.trim()}
+              className="flex-1"
+            >
+              {isUploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Criar Template
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={removeFile}
+              disabled={isUploading}
+            >
+              Cancelar
+            </Button>
+          </div>
+
+          {/* Progress Bar durante upload */}
+          {isUploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Criando template...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Mensagens de Status */}
-      {error && (
+      {error && !showForm && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {success && (
+      {success && !showForm && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
           <AlertDescription>
-            Imagem carregada com sucesso! Você pode prosseguir para configurar os placeholders.
+            Template criado com sucesso! Ele já está disponível na lista.
           </AlertDescription>
         </Alert>
       )}

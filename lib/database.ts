@@ -153,6 +153,23 @@ export const dbHelpers = {
     `
     },
 
+    // Criar novo template
+    async createTemplate(template: Omit<Template, 'created_at' | 'updated_at'>) {
+        const [newTemplate] = await sql`
+      INSERT INTO templates (
+        id, name, description, image_url, image_key, lottery_type,
+        status, is_public, usage_count, average_generation_time, created_by
+      ) VALUES (
+        ${template.id}, ${template.name}, ${template.description}, ${template.image_url},
+        ${template.image_key}, ${template.lottery_type}, ${template.status},
+        ${template.is_public}, ${template.usage_count}, ${template.average_generation_time},
+        ${template.created_by}
+      )
+      RETURNING *
+    `
+        return newTemplate
+    },
+
     // Buscar imagens geradas por template
     async getGeneratedImages(templateId: string, limit = 50) {
         if (!templateId || templateId.trim() === '') {

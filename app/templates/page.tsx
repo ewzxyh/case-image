@@ -42,6 +42,9 @@ export default function TemplatesPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
+    const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+    const [isSaving, setIsSaving] = useState(false)
+
 
     useEffect(() => {
         const fetchTemplates = async () => {
@@ -145,6 +148,21 @@ export default function TemplatesPage() {
     }
 
     const handleUpdateTemplate = async (templateId: string, updates: Partial<Template>) => {
+        // Prevenir operações simultâneas
+        if (isSaving) return
+
+        // Validação básica
+        if (!templateId) {
+            toast({
+                title: "Erro",
+                description: "ID do template não encontrado.",
+                variant: "destructive"
+            })
+            return
+        }
+
+        setIsSaving(true)
+
         try {
             const response = await fetch(`/api/templates/${templateId}`, {
                 method: 'PUT',
@@ -155,7 +173,8 @@ export default function TemplatesPage() {
             })
 
             if (!response.ok) {
-                throw new Error('Erro ao atualizar template')
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.error || 'Erro ao atualizar template')
             }
 
             const data = await response.json()
@@ -168,19 +187,55 @@ export default function TemplatesPage() {
                 )
             } : null)
 
+            // Atualizar o estado local com os dados retornados da API
+            if (data.template) {
+                setEditingTemplate(prev => prev ? { ...prev, ...data.template } : data.template)
+            }
+
             toast({
-                title: "Template atualizado",
-                description: "As configurações foram salvas com sucesso.",
+                title: "Alterado com sucesso",
+                description: "Template atualizado!",
             })
 
-            setSelectedTemplate(null)
-        } catch {
+        } catch (error) {
+            console.error('Erro ao atualizar template:', error)
             toast({
-                title: "Erro ao atualizar",
-                description: "Não foi possível salvar as configurações.",
+                title: "Não foi alterado",
+                description: error instanceof Error ? error.message : "Erro ao salvar as configurações.",
                 variant: "destructive"
             })
+        } finally {
+            setIsSaving(false)
         }
+    }
+
+    const handleTemplateCreated = () => {
+        // Recarregar lista de templates
+        const fetchTemplates = async () => {
+            try {
+                const response = await fetch('/api/templates')
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar templates')
+                }
+                const data = await response.json()
+                setTemplatesData(data)
+            } catch (err) {
+                console.error('Erro ao buscar templates:', err)
+                toast({
+                    title: "Erro ao atualizar lista",
+                    description: "A lista de templates pode não estar atualizada.",
+                    variant: "destructive"
+                })
+            }
+        }
+
+        fetchTemplates()
+    }
+
+    const handleCloseModal = () => {
+        setSelectedTemplate(null)
+        setEditingTemplate(null)
+        setIsSaving(false)
     }
 
     return (
@@ -225,25 +280,27 @@ export default function TemplatesPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ImageUpload />
+                    <ImageUpload onTemplateCreated={handleTemplateCreated} />
                 </CardContent>
             </Card>
 
             {/* Lista de Templates */}
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4 items-stretch">
                 {templates.map((template) => (
-                    <Card key={template.id} className="group hover:shadow-lg transition-all duration-200">
-                        <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg">{template.name}</CardTitle>
+                    <Card key={template.id} className="group hover:shadow-lg transition-all duration-200 flex flex-col h-full">
+                        <CardHeader className="pb-3 flex-shrink-0">
+                            <div className="flex items-start justify-between gap-3 min-h-[2.5rem]">
+                                <CardTitle className="text-lg leading-tight flex-1 min-w-0 pr-2">
+                                    <span className="line-clamp-1 block">{template.name}</span>
+                                </CardTitle>
                                 <Badge
                                     variant={template.status === 'active' ? 'secondary' : 'outline'}
                                     className={
                                         template.status === 'active'
-                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex-shrink-0 self-start mt-0.5'
                                             : template.status === 'draft'
-                                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
-                                                : ''
+                                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300 flex-shrink-0 self-start mt-0.5'
+                                                : 'flex-shrink-0 self-start mt-0.5'
                                     }
                                 >
                                     {template.status === 'active' ? 'Ativo' :
@@ -251,13 +308,16 @@ export default function TemplatesPage() {
                                             template.status === 'draft' ? 'Rascunho' : template.status}
                                 </Badge>
                             </div>
-                            <CardDescription>
-                                {template.description || 'Sem descrição disponível'}
+                            <CardDescription className="overflow-hidden text-ellipsis">
+                                <div className="line-clamp-1">
+                                    {template.description || 'Sem descrição disponível'}
+                                </div>
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+
+                        <CardContent className="space-y-4 flex-1 flex flex-col">
                             {/* Preview do Template */}
-                            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                            <div className="aspect-video bg-muted rounded-lg overflow-hidden flex-shrink-0">
                                 {template.image_url ? (
                                     <Image
                                         src={template.image_url}
@@ -274,23 +334,23 @@ export default function TemplatesPage() {
                             </div>
 
                             {/* Estatísticas */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="text-center">
+                            <div className="grid grid-cols-2 gap-4 text-sm flex-shrink-0 min-h-[4rem]">
+                                <div className="text-center flex flex-col justify-center">
                                     <p className="font-medium text-lg">{template.usage_count.toLocaleString()}</p>
-                                    <p className="text-muted-foreground">Usos</p>
+                                    <p className="text-muted-foreground text-sm">Usos</p>
                                 </div>
-                                <div className="text-center">
+                                <div className="text-center flex flex-col justify-center">
                                     <p className="font-medium text-lg">
                                         {template.current_avg_time && typeof template.current_avg_time === 'number'
                                             ? `${template.current_avg_time.toFixed(1)}s`
                                             : '--'}
                                     </p>
-                                    <p className="text-muted-foreground">Tempo Médio</p>
+                                    <p className="text-muted-foreground text-sm">Tempo Médio</p>
                                 </div>
                             </div>
 
-                            {/* Ações */}
-                            <div className="flex gap-2">
+                            {/* Ações - sempre no final */}
+                            <div className="flex gap-2 mt-auto pt-2">
                                 <Button
                                     size="sm"
                                     className="flex-1 cursor-pointer"
@@ -306,66 +366,140 @@ export default function TemplatesPage() {
                                             size="sm"
                                             variant="outline"
                                             className="cursor-pointer"
-                                            onClick={() => setSelectedTemplate(template)}
+                                            onClick={() => {
+                                                setSelectedTemplate(template)
+                                                setEditingTemplate(template)
+                                            }}
                                         >
                                             <Settings className="h-4 w-4" />
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
+                                    <DialogContent className="sm:max-w-[500px]">
                                         <DialogHeader>
-                                            <DialogTitle>Configurações do Template</DialogTitle>
+                                            <DialogTitle className="flex items-center gap-2">
+                                                <Settings className="h-5 w-5" />
+                                                Configurações do Template
+                                            </DialogTitle>
                                             <DialogDescription>
-                                                Ajuste as configurações do template &ldquo;{selectedTemplate?.name}&rdquo;.
+                                                Configure as opções do template selecionado.
                                             </DialogDescription>
                                         </DialogHeader>
-                                        {selectedTemplate && (
+
+                                        <div className="space-y-6">
+                                            {/* Informações do Template */}
+                                            <div className="bg-muted/50 p-4 rounded-lg">
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="font-medium text-muted-foreground">Tipo de Loteria:</span>
+                                                        <p className="capitalize">
+                                                            {editingTemplate?.lottery_type || 'Não especificado'}
+                                                        </p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium text-muted-foreground">Status Atual:</span>
+                                                        <p>
+                                                            {editingTemplate?.status === 'active' && '🟢 Ativo'}
+                                                            {editingTemplate?.status === 'inactive' && '🔴 Inativo'}
+                                                            {editingTemplate?.status === 'draft' && '📝 Rascunho'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Campos Editáveis */}
                                             <div className="space-y-4">
                                                 <div>
-                                                    <Label htmlFor="template-name">Nome</Label>
+                                                    <Label htmlFor="template-name" className="text-sm font-medium">
+                                                        Nome do Template *
+                                                    </Label>
                                                     <Input
                                                         id="template-name"
                                                         type="text"
                                                         className="w-full mt-1"
-                                                        defaultValue={selectedTemplate.name}
-                                                        onChange={(e) => setSelectedTemplate(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                                        placeholder="Digite o nome do template"
+                                                        defaultValue={editingTemplate?.name || ''}
+                                                        onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, name: e.target.value } : null)}
                                                     />
                                                 </div>
+
                                                 <div>
-                                                    <Label htmlFor="template-description">Descrição</Label>
+                                                    <Label htmlFor="template-description" className="text-sm font-medium">
+                                                        Descrição
+                                                    </Label>
                                                     <Textarea
                                                         id="template-description"
                                                         className="w-full mt-1"
                                                         rows={3}
-                                                        defaultValue={selectedTemplate.description || ''}
-                                                        onChange={(e) => setSelectedTemplate(prev => prev ? { ...prev, description: e.target.value } : null)}
+                                                        placeholder="Adicione uma descrição para o template (opcional)"
+                                                        defaultValue={editingTemplate?.description || ''}
+                                                        onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, description: e.target.value } : null)}
                                                     />
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Uma boa descrição ajuda na organização dos templates
+                                                    </p>
                                                 </div>
+
                                                 <div>
-                                                    <Label htmlFor="template-status">Status</Label>
+                                                    <Label htmlFor="template-status" className="text-sm font-medium">
+                                                        Status do Template
+                                                    </Label>
                                                     <Select
-                                                        value={selectedTemplate.status}
-                                                        onValueChange={(value) => setSelectedTemplate(prev => prev ? { ...prev, status: value } : null)}
+                                                        value={editingTemplate?.status || 'active'}
+                                                        onValueChange={(value) => setEditingTemplate(prev => prev ? { ...prev, status: value } : null)}
                                                     >
-                                                        <SelectTrigger id="template-status">
+                                                        <SelectTrigger id="template-status" className="mt-1">
                                                             <SelectValue placeholder="Selecione o status" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="active">Ativo</SelectItem>
-                                                            <SelectItem value="inactive">Inativo</SelectItem>
-                                                            <SelectItem value="draft">Rascunho</SelectItem>
+                                                            <SelectItem value="active">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-green-500">●</span>
+                                                                    Ativo - Disponível para uso
+                                                                </div>
+                                                            </SelectItem>
+                                                            <SelectItem value="inactive">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-red-500">●</span>
+                                                                    Inativo - Temporariamente indisponível
+                                                                </div>
+                                                            </SelectItem>
+                                                            <SelectItem value="draft">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-orange-500">●</span>
+                                                                    Rascunho - Em desenvolvimento
+                                                                </div>
+                                                            </SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
-                                                <DialogFooter>
-                                                    <Button
-                                                        onClick={() => handleUpdateTemplate(selectedTemplate.id, selectedTemplate)}
-                                                        disabled={!selectedTemplate.name.trim()}
-                                                    >
-                                                        Salvar Alterações
-                                                    </Button>
-                                                </DialogFooter>
                                             </div>
-                                        )}
+
+                                            <DialogFooter className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={handleCloseModal}
+                                                    disabled={isSaving}
+                                                >
+                                                    Fechar
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleUpdateTemplate(editingTemplate?.id || '', editingTemplate || {})}
+                                                    disabled={isSaving || !editingTemplate?.name || !editingTemplate.name.trim()}
+                                                >
+                                                    {isSaving ? (
+                                                        <>
+                                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                            Salvando...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Settings className="h-4 w-4 mr-2" />
+                                                            Salvar
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </DialogFooter>
+                                        </div>
                                     </DialogContent>
                                 </Dialog>
 
