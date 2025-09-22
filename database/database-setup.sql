@@ -8,6 +8,11 @@
 -- CONFIGURAÇÃO INICIAL
 -- =================================================
 
+-- Script para adicionar colunas novas aos templates existentes
+-- ALTER TABLE templates ADD COLUMN IF NOT EXISTS image_is_background BOOLEAN DEFAULT true;
+-- ALTER TABLE templates ADD COLUMN IF NOT EXISTS canvas_width INTEGER;
+-- ALTER TABLE templates ADD COLUMN IF NOT EXISTS canvas_height INTEGER;
+
 -- Extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -39,6 +44,9 @@ CREATE TABLE templates (
     lottery_type VARCHAR(100),
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'draft')),
     is_public BOOLEAN DEFAULT false,
+    image_is_background BOOLEAN DEFAULT true,
+    canvas_width INTEGER,
+    canvas_height INTEGER,
     usage_count INTEGER DEFAULT 0,
     average_generation_time DECIMAL(5,2),
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,

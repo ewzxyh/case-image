@@ -49,7 +49,7 @@ Sistema automatizado para geração de imagens para redes sociais baseadas nos r
 
 ### 2.3 Editor Visual com Fabric.js
 
-- [ ] Integrar Fabric.js no projeto
+- [ ] Integrar Fabric.js no projeto versão 6 (Siga a documentação oficial do Fabric.js V6 - NÃO UTILIZE A IMPLEMENTAÇÃO DA VERSÃO 5)
 - [ ] Criar canvas responsivo para edição
 - [ ] Implementar ferramentas de desenho de placeholders:
   - Retângulos para áreas de texto

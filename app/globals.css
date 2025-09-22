@@ -179,6 +179,20 @@
   height: attr(data-height px);
 }
 
+/* Fabric.js canvas styles */
+.fabric-canvas {
+  display: block;
+  border: 1px solid #e5e7eb;
+  border-radius: 0px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Sortable layer styles for drag animations */
+.sortable-layer {
+  /* Transform and transition are applied dynamically via JavaScript for @dnd-kit compatibility */
+}
+
 /* Button cursor styles */
 button {
   cursor: pointer;

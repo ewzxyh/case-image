@@ -41,7 +41,6 @@ export default function TemplatesPage() {
     const [templatesData, setTemplatesData] = useState<TemplatesData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
     const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
     const [isSaving, setIsSaving] = useState(false)
 
@@ -233,7 +232,6 @@ export default function TemplatesPage() {
     }
 
     const handleCloseModal = () => {
-        setSelectedTemplate(null)
         setEditingTemplate(null)
         setIsSaving(false)
     }
@@ -367,7 +365,6 @@ export default function TemplatesPage() {
                                             variant="outline"
                                             className="cursor-pointer"
                                             onClick={() => {
-                                                setSelectedTemplate(template)
                                                 setEditingTemplate(template)
                                             }}
                                         >
