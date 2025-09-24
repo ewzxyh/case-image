@@ -128,71 +128,6 @@
   }
 }
 
-/* Editor Styles */
-.placeholder-overlay {
-  position: absolute;
-  border: 2px solid rgb(59 130 246);
-  background-color: rgb(59 130 246 / 0.1);
-}
-
-/* Canvas zoom styles */
-.canvas-container {
-  transform-origin: center center;
-}
-
-.canvas-container[data-zoom="0.25"] {
-  transform: scale(0.25);
-}
-.canvas-container[data-zoom="0.5"] {
-  transform: scale(0.5);
-}
-.canvas-container[data-zoom="0.75"] {
-  transform: scale(0.75);
-}
-.canvas-container[data-zoom="1"] {
-  transform: scale(1);
-}
-.canvas-container[data-zoom="1.25"] {
-  transform: scale(1.25);
-}
-.canvas-container[data-zoom="1.5"] {
-  transform: scale(1.5);
-}
-.canvas-container[data-zoom="2"] {
-  transform: scale(2);
-}
-.canvas-container[data-zoom="2.5"] {
-  transform: scale(2.5);
-}
-.canvas-container[data-zoom="3"] {
-  transform: scale(3);
-}
-
-/* Placeholder positioning styles */
-.placeholder-overlay {
-  position: absolute;
-  border: 2px solid rgb(59 130 246);
-  background-color: rgb(59 130 246 / 0.1);
-  left: attr(data-left px);
-  top: attr(data-top px);
-  width: attr(data-width px);
-  height: attr(data-height px);
-}
-
-/* Fabric.js canvas styles */
-.fabric-canvas {
-  display: block;
-  border: 1px solid #e5e7eb;
-  border-radius: 0px;
-  max-width: 100%;
-  max-height: 100%;
-}
-
-/* Sortable layer styles for drag animations */
-.sortable-layer {
-  /* Transform and transition are applied dynamically via JavaScript for @dnd-kit compatibility */
-}
-
 /* Button cursor styles */
 button {
   cursor: pointer;
@@ -206,31 +141,51 @@ button {
   cursor: pointer;
 }
 
-/* Line clamp utilities for template descriptions */
-.line-clamp-1 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+/* Editor specific styles */
+#canvas {
+  border: 1px solid hsl(var(--border));
+  background: white;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-.line-clamp-2 {
+/* Editor toolbar integration with main sidebar */
+.editor-toolbar {
+  transition: all 0.2s ease-in-out;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
-.line-clamp-3 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+.editor-toolbar.collapsed {
+  width: 0;
+  padding: 0;
+  margin: 0;
 }
 
-.line-clamp-4 {
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+.editor-toolbar.expanded {
+  width: 20rem;
+  min-width: 20rem;
+}
+
+/* Canvas container responsive */
+@media (max-width: 768px) {
+  .editor-toolbar.expanded {
+    width: 100%;
+    min-width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    background: hsl(var(--background));
+  }
+}
+
+/* Canvas elements styling */
+.canvas-element {
+  stroke: #333;
+  stroke-width: 2;
+  fill: #000;
+}
+
+.canvas-element:hover {
+  opacity: 0.8;
 }
