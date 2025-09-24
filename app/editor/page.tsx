@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useSidebar } from "@/components/ui/sidebar";
 
+// Componente wrapper para o CanvasSettings flutuante
+function FloatingCanvasSettings({ canvas }: { canvas: Canvas | null }) {
+    return <CanvasSettings canvas={canvas} />;
+}
+
 export default function EditorPage() {
     const canvasRef = useRef(null);
     const [canvas, setCanvas] = useState<Canvas | null>(null);
@@ -59,7 +64,7 @@ export default function EditorPage() {
     const { state } = useSidebar();
 
     return (
-        <div className="flex h-full w-full">
+        <div className="flex h-full w-full relative">
             {/* Toolbar lateral do editor - integrada com sidebar principal */}
             <div className={`editor-toolbar ${state === 'expanded' ? 'expanded' : 'collapsed'
                 }`}>
@@ -100,11 +105,13 @@ export default function EditorPage() {
 
             {/* Área principal do canvas */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                <CanvasSettings canvas={canvas} />
-                <div className="flex-1 p-4 min-h-0 bg-neutral-800 overflow-hidden">
+                <div className="flex-1 p-4 min-h-0 bg-neutral-800 relative">
                     <canvas id="canvas" ref={canvasRef} className="" />
                 </div>
             </div>
+
+            {/* CanvasSettings flutuante - posicionado no nível da página */}
+            <FloatingCanvasSettings canvas={canvas} />
         </div>
     )
 }

@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
+import { X, GripVertical } from "lucide-react";
 
 interface CanvasSettingsProps {
     canvas?: unknown;
@@ -60,7 +60,66 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
     const [borderColor, setBorderColor] = useState<string>("#000000");
     const [borderWidth, setBorderWidth] = useState<number>(0);
     const [opacity, setOpacity] = useState<number>(1);
-    const [visible, setVisible] = useState<boolean>(true);
+
+    // Estados para posicionamento flutuante
+    const [cardPosition, setCardPosition] = useState({ x: 100, y: 100 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const cardRef = useRef<HTMLDivElement>(null);
+
+    const handleObjectSelection = useCallback((object: unknown) => {
+        if (!object) return;
+
+        const fabricObject = object as FabricObject;
+        setSelectedObject(fabricObject);
+
+        // Posicionar card acima do objeto selecionado no canvas
+        const canvasElement = document.getElementById('canvas');
+        if (canvasElement && fabricCanvas) {
+            const canvasRect = canvasElement.getBoundingClientRect();
+            const centerX = fabricObject.left || 0;
+            const centerY = fabricObject.top || 0;
+            const cardWidth = 280; // Largura estimada do card
+            const cardHeight = 400; // Altura estimada do card
+
+            // Calcular posição considerando a posição do canvas na página
+            const canvasLeft = canvasRect.left;
+            const canvasTop = canvasRect.top;
+
+            // Converter coordenadas do canvas para coordenadas da tela
+            const objectX = canvasLeft + centerX;
+            const objectY = canvasTop + centerY;
+
+            let newX = objectX - cardWidth / 2;
+            let newY = objectY - cardHeight - 20; // 20px acima do objeto
+
+            // Ajustar posição para manter o card dentro da tela
+            newX = Math.max(10, Math.min(newX, window.innerWidth - cardWidth - 10));
+            newY = Math.max(10, Math.min(newY, window.innerHeight - cardHeight - 10));
+
+            setCardPosition({ x: newX, y: newY });
+        }
+
+        if (fabricObject.type === "rect") {
+            const rect = fabricObject as RectProps;
+            setWidth(Math.round((rect.width || 0) * (rect.scaleX || 1)));
+            setHeight(Math.round((rect.height || 0) * (rect.scaleY || 1)));
+            setColor(rect.fill || "#000000");
+            setDiameter(0);
+            setBorderColor(rect.stroke || "#000000");
+            setBorderWidth(rect.strokeWidth || 0);
+            setOpacity(rect.opacity || 1);
+        } else if (fabricObject.type === "circle") {
+            const circle = fabricObject as CircleProps;
+            setWidth(0);
+            setHeight(0);
+            setDiameter(Math.round((circle.radius || 0) * 2 * (circle.scaleX || 1)));
+            setColor(circle.fill || "#000000");
+            setBorderColor(circle.stroke || "#000000");
+            setBorderWidth(circle.strokeWidth || 0);
+            setOpacity(circle.opacity || 1);
+        }
+    }, [fabricCanvas]);
 
     useEffect(() => {
         if (fabricCanvas) {
@@ -85,36 +144,7 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
                 handleObjectSelection((event as { target?: unknown })?.target);
             });
         }
-    }, [fabricCanvas]);
-
-    const handleObjectSelection = (object: unknown) => {
-        if (!object) return;
-
-        const fabricObject = object as FabricObject;
-        setSelectedObject(fabricObject);
-
-        if (fabricObject.type === "rect") {
-            const rect = fabricObject as RectProps;
-            setWidth(Math.round((rect.width || 0) * (rect.scaleX || 1)));
-            setHeight(Math.round((rect.height || 0) * (rect.scaleY || 1)));
-            setColor(rect.fill || "#000000");
-            setDiameter(0);
-            setBorderColor(rect.stroke || "#000000");
-            setBorderWidth(rect.strokeWidth || 0);
-            setOpacity(rect.opacity || 1);
-            setVisible(rect.visible !== false);
-        } else if (fabricObject.type === "circle") {
-            const circle = fabricObject as CircleProps;
-            setWidth(0);
-            setHeight(0);
-            setDiameter(Math.round((circle.radius || 0) * 2 * (circle.scaleX || 1)));
-            setColor(circle.fill || "#000000");
-            setBorderColor(circle.stroke || "#000000");
-            setBorderWidth(circle.strokeWidth || 0);
-            setOpacity(circle.opacity || 1);
-            setVisible(circle.visible !== false);
-        }
-    }
+    }, [fabricCanvas, handleObjectSelection]);
 
     const clearSettings = () => {
         setWidth(0);
@@ -124,7 +154,6 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
         setBorderColor("#000000");
         setBorderWidth(0);
         setOpacity(1);
-        setVisible(true);
     }
 
     const updateObjectProperty = (property: string, value: unknown) => {
@@ -186,11 +215,6 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
         updateObjectProperty("opacity", numValue);
     }
 
-    const handleVisibleChange = (checked: boolean) => {
-        setVisible(checked);
-        updateObjectProperty("visible", checked);
-    }
-
     const deleteSelectedObject = () => {
         if (selectedObject && fabricCanvas) {
             fabricCanvas.remove?.(selectedObject);
@@ -200,188 +224,183 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
         }
     }
 
+    // Funções para drag
+    const handleMouseDown = (e: React.MouseEvent) => {
+        // Permitir arraste em qualquer parte do header do card
+        const target = e.target as HTMLElement;
+        const header = target.closest('[data-drag-handle]') || target.closest('.cursor-grab');
+
+        if (header || target === e.currentTarget) {
+            setIsDragging(true);
+            const rect = cardRef.current?.getBoundingClientRect();
+            if (rect) {
+                setDragOffset({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                });
+            }
+            e.preventDefault();
+        }
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (isDragging) {
+            const newX = e.clientX - dragOffset.x;
+            const newY = e.clientY - dragOffset.y;
+            const cardWidth = 280;
+            const cardHeight = 400;
+
+            const adjustedX = Math.max(10, Math.min(newX, window.innerWidth - cardWidth - 10));
+            const adjustedY = Math.max(10, Math.min(newY, window.innerHeight - cardHeight - 10));
+
+            setCardPosition({ x: adjustedX, y: adjustedY });
+        }
+    }, [isDragging, dragOffset]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsDragging(false);
+    }, []);
+
+    useEffect(() => {
+        if (isDragging) {
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = 'none';
+
+            return () => {
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                document.body.style.userSelect = 'select';
+            };
+        }
+    }, [isDragging, handleMouseMove, handleMouseUp]);
+
 
     if (!selectedObject) {
-        return (
-            <div className="p-4 border-b bg-background">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h3 className="text-sm font-medium text-muted-foreground">
-                            Propriedades do Elemento
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            Selecione um elemento no canvas para editar suas propriedades
-                        </p>
-                    </div>
-                </div>
-            </div>
-        )
+        return null; // Não renderizar nada quando não há objeto selecionado
     }
 
     return (
-        <div className="p-4 border-b bg-background space-y-4">
-            <div>
-                <h3 className="text-sm font-medium text-foreground">
-                    Propriedades do Elemento
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                    {selectedObject?.type === 'rect' ? 'Retângulo' : 'Círculo'} selecionado
-                </p>
-            </div>
+        <div
+            ref={cardRef}
+            className={`fixed floating-canvas-settings ${isDragging ? 'dragging' : ''}`}
+            style={{
+                left: cardPosition.x,
+                top: cardPosition.y,
+            }}
+            onMouseDown={handleMouseDown}
+        >
+            <Card className="shadow-lg border-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 cursor-grab" data-drag-handle>
+                    <div className="flex items-center gap-2">
+                        <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-xs font-medium">
+                            {selectedObject?.type === 'rect' ? 'Retângulo' : 'Círculo'}
+                        </CardTitle>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={deleteSelectedObject}
+                    >
+                        <X className="h-3 w-3" />
+                    </Button>
+                </CardHeader>
 
-            <div className="space-y-4">
-                {/* Dimensões */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Dimensões</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {selectedObject?.type === "rect" ? (
-                            <>
-                                <div className="space-y-1">
-                                    <Label htmlFor="width" className="text-xs">Largura</Label>
-                                    <Input
-                                        id="width"
-                                        type="number"
-                                        value={width}
-                                        onChange={(e) => handleWidthChange(e.target.value)}
-                                        placeholder="Largura em px"
-                                        className="h-8"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label htmlFor="height" className="text-xs">Altura</Label>
-                                    <Input
-                                        id="height"
-                                        type="number"
-                                        value={height}
-                                        onChange={(e) => handleHeightChange(e.target.value)}
-                                        placeholder="Altura em px"
-                                        className="h-8"
-                                    />
-                                </div>
-                            </>
-                        ) : (
+                <CardContent className="space-y-3 pt-2">
+                    {/* Dimensões - Compacto */}
+                    {selectedObject?.type === "rect" ? (
+                        <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                                <Label htmlFor="diameter" className="text-xs">Diâmetro</Label>
+                                <Label className="text-[10px] text-muted-foreground">L</Label>
                                 <Input
-                                    id="diameter"
                                     type="number"
-                                    value={diameter}
-                                    onChange={(e) => handleDiameterChange(e.target.value)}
-                                    placeholder="Diâmetro em px"
-                                    className="h-8"
+                                    value={width}
+                                    onChange={(e) => handleWidthChange(e.target.value)}
+                                    className="h-7 text-xs"
                                 />
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Cores */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Cores</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="space-y-1">
-                            <Label htmlFor="color" className="text-xs">Cor de Fundo</Label>
-                            <div className="flex gap-2">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">A</Label>
                                 <Input
-                                    id="color"
-                                    type="color"
-                                    value={color}
-                                    onChange={(e) => handleColorChange(e.target.value)}
-                                    className="w-12 h-8 p-0 border-0"
-                                />
-                                <Input
-                                    type="text"
-                                    value={color}
-                                    onChange={(e) => handleColorChange(e.target.value)}
-                                    placeholder="#000000"
-                                    className="flex-1 h-8"
+                                    type="number"
+                                    value={height}
+                                    onChange={(e) => handleHeightChange(e.target.value)}
+                                    className="h-7 text-xs"
                                 />
                             </div>
                         </div>
+                    ) : (
                         <div className="space-y-1">
-                            <Label htmlFor="borderColor" className="text-xs">Cor da Borda</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="borderColor"
-                                    type="color"
-                                    value={borderColor}
-                                    onChange={(e) => handleBorderColorChange(e.target.value)}
-                                    className="w-12 h-8 p-0 border-0"
-                                />
-                                <Input
-                                    type="text"
-                                    value={borderColor}
-                                    onChange={(e) => handleBorderColorChange(e.target.value)}
-                                    placeholder="#000000"
-                                    className="flex-1 h-8"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="borderWidth" className="text-xs">Espessura da Borda</Label>
+                            <Label className="text-[10px] text-muted-foreground">D</Label>
                             <Input
-                                id="borderWidth"
                                 type="number"
-                                value={borderWidth}
-                                onChange={(e) => handleBorderWidthChange(e.target.value)}
-                                placeholder="Espessura em px"
-                                className="h-8"
+                                value={diameter}
+                                onChange={(e) => handleDiameterChange(e.target.value)}
+                                className="h-7 text-xs"
                             />
                         </div>
-                    </CardContent>
-                </Card>
+                    )}
 
-                {/* Aparência */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Aparência</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label className="text-xs">Opacidade: {Math.round(opacity * 100)}%</Label>
-                            <Slider
-                                value={[opacity]}
-                                onValueChange={handleOpacityChange}
-                                max={1}
-                                min={0}
-                                step={0.01}
-                                className="w-full"
-                            />
+                    {/* Cores - Compacto */}
+                    <div className="space-y-2">
+                        <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">Fundo</Label>
+                            <div className="flex gap-1">
+                                <Input
+                                    type="color"
+                                    value={color}
+                                    onChange={(e) => handleColorChange(e.target.value)}
+                                    className="w-8 h-7 p-0 border-0"
+                                />
+                                <Input
+                                    type="text"
+                                    value={color}
+                                    onChange={(e) => handleColorChange(e.target.value)}
+                                    className="flex-1 h-7 text-xs"
+                                />
+                            </div>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="visible" className="text-xs">Visível</Label>
-                            <Switch
-                                id="visible"
-                                checked={visible}
-                                onCheckedChange={handleVisibleChange}
-                            />
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Borda</Label>
+                                <div className="flex gap-1">
+                                    <Input
+                                        type="color"
+                                        value={borderColor}
+                                        onChange={(e) => handleBorderColorChange(e.target.value)}
+                                        className="w-6 h-7 p-0 border-0"
+                                    />
+                                    <Input
+                                        type="number"
+                                        value={borderWidth}
+                                        onChange={(e) => handleBorderWidthChange(e.target.value)}
+                                        className="flex-1 h-7 text-xs"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
 
-                {/* Ações */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Ações</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-
-                        <Button
-                            onClick={deleteSelectedObject}
-                            variant="destructive"
-                            size="sm"
-                            className="w-full text-xs"
-                        >
-                            Excluir Elemento
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
+                    {/* Opacidade */}
+                    <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                            Opacidade: {Math.round(opacity * 100)}%
+                        </Label>
+                        <Slider
+                            value={[opacity]}
+                            onValueChange={handleOpacityChange}
+                            max={1}
+                            min={0}
+                            step={0.01}
+                            className="w-full"
+                        />
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     )
 }

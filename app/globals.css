@@ -189,3 +189,48 @@ button {
 .canvas-element:hover {
   opacity: 0.8;
 }
+
+/* Floating canvas settings */
+.floating-canvas-settings {
+  z-index: 1000;
+  user-select: none;
+  width: 280px;
+  position: fixed !important;
+  pointer-events: auto;
+  transition: left 0.1s ease-out, top 0.1s ease-out;
+  will-change: left, top;
+}
+
+.floating-canvas-settings.dragging {
+  cursor: grabbing !important;
+  pointer-events: auto !important;
+  transition: none;
+}
+
+.floating-canvas-settings .cursor-grab {
+  cursor: grab;
+}
+
+.floating-canvas-settings .cursor-grabbing {
+  cursor: grabbing;
+}
+
+/* Smooth transitions for the floating card */
+.floating-canvas-settings > div {
+  transition: box-shadow 0.2s ease-in-out;
+}
+
+.floating-canvas-settings:hover > div {
+  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Prevent text selection during drag */
+.floating-canvas-settings.dragging * {
+  user-select: none;
+  pointer-events: none;
+}
+
+.floating-canvas-settings.dragging > div {
+  pointer-events: auto;
+}
