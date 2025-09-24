@@ -4,7 +4,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { X, GripVertical } from "lucide-react";
+import { X, GripVertical, Trash2 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface CanvasSettingsProps {
     canvas?: unknown;
@@ -46,6 +57,7 @@ interface FabricCanvas {
     on(event: string, handler: (event: unknown) => void): void;
     remove?(object: FabricObject): void;
     renderAll(): void;
+    discardActiveObject(): boolean;
 }
 
 type FabricObject = RectProps | CircleProps;
@@ -62,9 +74,10 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
     const [opacity, setOpacity] = useState<number>(1);
 
     // Estados para posicionamento flutuante
-    const [cardPosition, setCardPosition] = useState({ x: 100, y: 100 });
+    const [cardPosition, setCardPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [isPositionedByUser, setIsPositionedByUser] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
     const handleObjectSelection = useCallback((object: unknown) => {
@@ -73,31 +86,16 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
         const fabricObject = object as FabricObject;
         setSelectedObject(fabricObject);
 
-        // Posicionar card acima do objeto selecionado no canvas
-        const canvasElement = document.getElementById('canvas');
-        if (canvasElement && fabricCanvas) {
-            const canvasRect = canvasElement.getBoundingClientRect();
-            const centerX = fabricObject.left || 0;
-            const centerY = fabricObject.top || 0;
-            const cardWidth = 280; // Largura estimada do card
-            const cardHeight = 400; // Altura estimada do card
+        if (!isPositionedByUser) {
+            // Posicionar card por padrão no canto inferior direito
+            const cardWidth = 280;
+            const cardHeight = 420; // Altura estimada para garantir visibilidade
+            const margin = 20;
 
-            // Calcular posição considerando a posição do canvas na página
-            const canvasLeft = canvasRect.left;
-            const canvasTop = canvasRect.top;
+            const defaultX = window.innerWidth - cardWidth - margin;
+            const defaultY = window.innerHeight - cardHeight - margin;
 
-            // Converter coordenadas do canvas para coordenadas da tela
-            const objectX = canvasLeft + centerX;
-            const objectY = canvasTop + centerY;
-
-            let newX = objectX - cardWidth / 2;
-            let newY = objectY - cardHeight - 20; // 20px acima do objeto
-
-            // Ajustar posição para manter o card dentro da tela
-            newX = Math.max(10, Math.min(newX, window.innerWidth - cardWidth - 10));
-            newY = Math.max(10, Math.min(newY, window.innerHeight - cardHeight - 10));
-
-            setCardPosition({ x: newX, y: newY });
+            setCardPosition({ x: defaultX, y: defaultY });
         }
 
         if (fabricObject.type === "rect") {
@@ -119,7 +117,7 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
             setBorderWidth(circle.strokeWidth || 0);
             setOpacity(circle.opacity || 1);
         }
-    }, [fabricCanvas]);
+    }, [fabricCanvas, isPositionedByUser]);
 
     useEffect(() => {
         if (fabricCanvas) {
@@ -134,6 +132,7 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
             fabricCanvas.on("selection:cleared", () => {
                 setSelectedObject(null);
                 clearSettings();
+                setIsPositionedByUser(false);
             });
 
             fabricCanvas.on("object:modified", (event: unknown) => {
@@ -215,12 +214,21 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
         updateObjectProperty("opacity", numValue);
     }
 
-    const deleteSelectedObject = () => {
+    const handleClose = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (fabricCanvas) {
+            fabricCanvas.discardActiveObject();
+            fabricCanvas.renderAll();
+            setSelectedObject(null);
+            setIsPositionedByUser(false);
+        }
+    };
+
+    const handleConfirmDelete = () => {
         if (selectedObject && fabricCanvas) {
             fabricCanvas.remove?.(selectedObject);
             fabricCanvas.renderAll();
             setSelectedObject(null);
-            clearSettings();
         }
     }
 
@@ -259,6 +267,7 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
+        setIsPositionedByUser(true);
     }, []);
 
     useEffect(() => {
@@ -298,14 +307,46 @@ function CanvasSettings({ canvas }: CanvasSettingsProps) {
                             {selectedObject?.type === 'rect' ? 'Retângulo' : 'Círculo'}
                         </CardTitle>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={deleteSelectedObject}
-                    >
-                        <X className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                    onMouseDown={(e) => {
+                                        e.stopPropagation();
+                                    }}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onMouseDown={(e) => e.stopPropagation()}>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Esta ação não pode ser desfeita. Isso excluirá permanentemente o elemento.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleConfirmDelete}>Continuar</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 hover:bg-accent hover:text-accent-foreground"
+                            onClick={handleClose}
+                            onMouseDown={(e) => {
+                                // Impede que o onMouseDown do contêiner de arraste seja acionado
+                                e.stopPropagation();
+                            }}
+                        >
+                            <X className="h-3 w-3" />
+                        </Button>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="space-y-3 pt-2">
