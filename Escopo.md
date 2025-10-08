@@ -65,32 +65,59 @@ Dados da API (Exemplo da Mega-Sena):
 }
 
 Estrutura do Template (Exemplo a ser salvo no nosso sistema):
+Response for the single page templates:
 
 {
-  "templateId": "mega-sena-principal",
-  "imageUrl": "/templates/template-megasena.png",
-  "placeholders": [
+  "id": "c13bd141c7",
+  "templateId": "debcaw6f99",
+  "imageUrl": "https://api.dynapictures.com/images/d12fb6f526/e26ca071c7.png",
+  "thumbnailUrl": "https://api.dynapictures.com/images/d12fb6f526/e26ca071c7-thumb.png",
+  "retinaThumbnailUrl": "https://api.dynapictures.com/images/d12fb6f526/e26ca071c7-thumb-2x.png",
+  "metadata": "",
+  "width": 1000,
+  "height": 1500
+}
+
+Request body example
+
+{
+  "format": "jpeg",
+  "metadata": "Custom data",
+  "params": [
     {
-      "name": "{{VALOR_PREMIO}}",
-      "x": 150,
-      "y": 300,
-      "width": 800,
-      "height": 200,
-      "font": "Inter Black",
-      "fontSize": 180,
-      "color": "#00FF00",
-      "align": "center"
+      "name": "canvas",
+      "backgroundColor": "#fff"
     },
     {
-      "name": "{{STATUS_ACUMULADO}}",
-      "x": 200,
-      "y": 750,
-      "width": 700,
-      "height": 100,
-      "font": "Inter Bold",
-      "fontSize": 90,
-      "color": "#FFFF00",
-      "align": "center"
+      "name": "title",
+      "text": "Suspe tempus odio",
+      "color": "#333",
+      "backgroundColor": "#f9f9f9",
+      "borderColor": "#ddd",
+      "borderWidth": "1px",
+      "borderRadius": "5px",
+      "opacity": 1
+    },
+    {
+      "name": "text",
+      "text": "{VALOR_PREMIO}",
+      "color": "#333",
+      "backgroundColor": "#f9f9f9",
+      "borderColor": "#ddd",
+      "borderWidth": "1px",
+      "borderRadius": "5px",
+      "opacity": 1
+    },
+    {
+      "name": "image1",
+      "imageUrl": "https://dynapictures.com/images/banners/cat1.jpeg",
+      "imagePosition": "align",
+      "imageAlignH": "full",
+      "imageAlignV": "top",
+      "borderColor": "#ddd",
+      "borderWidth": "2px",
+      "borderRadius": "5px",
+      "opacity": 1
     }
   ]
 }

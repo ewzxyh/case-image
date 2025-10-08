@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '@/lib/database'
+import { dbHelpers, sql } from '@/lib/database'
+import type { TemplateDetailResponse, PageResponse, LayerResponse } from '@/lib/types/api'
+import type { TemplatePlaceholder } from '@/lib/types/database'
 
 export async function GET(
     request: NextRequest,
@@ -10,71 +12,88 @@ export async function GET(
 
         if (!templateId) {
             return NextResponse.json(
-                { error: 'ID do template não fornecido', status: 'error' },
+                { error: 'ID do template não fornecido' },
                 { status: 400 }
             )
         }
 
-        // Buscar template específico com placeholders
-        const templates = await sql`
-      SELECT
-        t.*,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'id', p.id,
-              'name', p.name,
-              'type', p.placeholder_type,
-              'x', p.x_position,
-              'y', p.y_position,
-              'width', p.width,
-              'height', p.height,
-              'fontSize', p.font_size,
-              'fontFamily', p.font_family,
-              'color', p.font_color,
-              'align', p.text_align
-            )
-          ) FILTER (WHERE p.id IS NOT NULL),
-          '[]'::json
-        ) as placeholders
-      FROM templates t
-      LEFT JOIN template_placeholders p ON t.id = p.template_id
-      WHERE t.id = ${templateId}
-      GROUP BY t.id
-    `
+        // Buscar template com canvases e placeholders
+        const template = await dbHelpers.getTemplateDeep(templateId)
 
-        if (templates.length === 0) {
+        if (!template) {
             return NextResponse.json(
-                { error: 'Template não encontrado', status: 'error' },
+                { error: 'Template não encontrado' },
                 { status: 404 }
             )
         }
 
-        const template = templates[0]
+        // Mapear para formato de resposta
+        const pages: PageResponse[] = template.canvases.map(canvas => ({
+            id: canvas.id,
+            name: canvas.name,
+            order: canvas.canvas_order,
+            width: canvas.width,
+            height: canvas.height,
+            backgroundColor: canvas.background_color,
+            backgroundAssetId: canvas.background_asset_id || undefined,
+            layers: canvas.placeholders.map((p: TemplatePlaceholder): LayerResponse => ({
+                id: p.id,
+                name: p.name,
+                type: p.placeholder_type,
+                x: p.x_position,
+                y: p.y_position,
+                width: p.width,
+                height: p.height,
+                zIndex: p.z_index,
 
-        // Formatar placeholders
-        const formattedPlaceholders = Array.isArray(template.placeholders)
-            ? template.placeholders
-            : []
+                // Text props
+                text: p.text_content || undefined,
+                fontFamily: p.font_family,
+                fontSize: p.font_size,
+                fontColor: p.font_color,
+                fontWeight: p.font_weight,
+                textAlign: p.text_align,
 
-        return NextResponse.json({
-            template: {
-                ...template,
-                placeholders: formattedPlaceholders
-            },
-            status: 'success'
-        })
+                // Image props
+                imageUrl: p.image_url || undefined,
+                imageAssetId: p.image_asset_id || undefined,
+                imagePosition: p.image_position,
+                imageAlignH: p.image_align_h,
+                imageAlignV: p.image_align_v,
+
+                // Common style props
+                backgroundColor: p.background_color || undefined,
+                borderColor: p.border_color || undefined,
+                borderWidth: p.border_width,
+                borderRadius: p.border_radius,
+                opacity: p.opacity,
+                isVisible: p.is_visible
+            }))
+        }))
+
+        const response: TemplateDetailResponse = {
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            status: template.status,
+            lottery_type: template.lottery_type,
+            created_at: template.created_at.toISOString(),
+            updated_at: template.updated_at.toISOString(),
+            pages
+        }
+
+        return NextResponse.json(response)
 
     } catch (error) {
         console.error('Erro ao buscar template:', error)
         return NextResponse.json(
-            { error: 'Erro interno do servidor', status: 'error' },
+            { error: 'Erro ao buscar template' },
             { status: 500 }
         )
     }
 }
 
-export async function PUT(
+export async function PATCH(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
@@ -84,40 +103,35 @@ export async function PUT(
 
         if (!templateId) {
             return NextResponse.json(
-                { error: 'ID do template não fornecido', status: 'error' },
+                { error: 'ID do template não fornecido' },
                 { status: 400 }
             )
         }
 
         // Atualizar template
-        const updatedTemplate = await sql`
-      UPDATE templates
-      SET
-        name = ${body.name || 'Template'},
-        description = ${body.description || null},
-        lottery_type = ${body.lottery_type || 'mega-sena'},
-        status = ${body.status || 'active'},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${templateId}
-      RETURNING *
-    `
+        const updatedTemplate = await dbHelpers.updateTemplate(templateId, {
+            name: body.name,
+            description: body.description,
+            lottery_type: body.lottery_type,
+            status: body.status
+        })
 
-        if (updatedTemplate.length === 0) {
+        if (!updatedTemplate) {
             return NextResponse.json(
-                { error: 'Template não encontrado', status: 'error' },
+                { error: 'Template não encontrado' },
                 { status: 404 }
             )
         }
 
         return NextResponse.json({
-            template: updatedTemplate[0],
-            status: 'success'
+            success: true,
+            template: updatedTemplate
         })
 
     } catch (error) {
         console.error('Erro ao atualizar template:', error)
         return NextResponse.json(
-            { error: 'Erro interno do servidor', status: 'error' },
+            { error: 'Erro ao atualizar template' },
             { status: 500 }
         )
     }
@@ -132,35 +146,26 @@ export async function DELETE(
 
         if (!templateId) {
             return NextResponse.json(
-                { error: 'ID do template não fornecido', status: 'error' },
+                { error: 'ID do template não fornecido' },
                 { status: 400 }
             )
         }
 
-        // Deletar template (isso também vai deletar os placeholders por CASCADE)
-        const deletedTemplate = await sql`
-      DELETE FROM templates
-      WHERE id = ${templateId}
-      RETURNING *
-    `
-
-        if (deletedTemplate.length === 0) {
-            return NextResponse.json(
-                { error: 'Template não encontrado', status: 'error' },
-                { status: 404 }
-            )
-        }
+        // Deletar template (CASCADE irá deletar canvases e placeholders)
+        await sql`
+            DELETE FROM templates
+            WHERE id = ${templateId}
+        `
 
         return NextResponse.json({
-            message: 'Template deletado com sucesso',
-            template: deletedTemplate[0],
-            status: 'success'
+            success: true,
+            message: 'Template deletado com sucesso'
         })
 
     } catch (error) {
         console.error('Erro ao deletar template:', error)
         return NextResponse.json(
-            { error: 'Erro interno do servidor', status: 'error' },
+            { error: 'Erro ao deletar template' },
             { status: 500 }
         )
     }

@@ -22,6 +22,8 @@ export async function GET() {
         return NextResponse.json({
             stats: {
                 totalTemplates: Number(stats.total_templates) || 0,
+                totalCanvases: Number(stats.total_canvases) || 0,
+                totalMediaAssets: Number(stats.total_media_assets) || 0,
                 imagesGenerated: Number(stats.images_last_30_days) || 0,
                 averageTime: Number(stats.avg_generation_time) || 0,
                 activeUsers: Number(stats.active_users_week) || 0

@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { dbHelpers } from '@/lib/database'
-import { writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import { join } from 'path'
-import { v4 as uuidv4 } from 'uuid'
+import type { TemplateListItem } from '@/lib/types/api'
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url)
         const status = searchParams.get('status') || 'all'
-        const limit = parseInt(searchParams.get('limit') || '20')
+        const limit = parseInt(searchParams.get('limit') || '50')
 
         // Buscar templates com estatísticas
-        const templates = await dbHelpers.getTemplatesWithStats()
+        const templates = await dbHelpers.listTemplatesWithStats()
 
         // Filtrar por status se especificado
         const filteredTemplates = status === 'all'
@@ -22,120 +19,75 @@ export async function GET(request: NextRequest) {
         // Limitar resultados
         const limitedTemplates = filteredTemplates.slice(0, limit)
 
-        // Buscar contagem total
-        const totalCount = filteredTemplates.length
+        // Mapear para resposta
+        const response: TemplateListItem[] = limitedTemplates.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            status: t.status,
+            canvas_count: t.canvas_count || 0,
+            usage_count: t.usage_count,
+            created_at: t.created_at.toISOString(),
+            updated_at: t.updated_at.toISOString()
+        }))
 
         return NextResponse.json({
-            templates: limitedTemplates,
-            total: totalCount,
+            templates: response,
+            total: filteredTemplates.length,
             status: status
         })
 
     } catch (error) {
         console.error('Erro ao buscar templates:', error)
-
-        // Retornar dados mockados como fallback
-        return NextResponse.json({
-            templates: [
-                {
-                    id: '550e8400-e29b-41d4-a716-446655440001',
-                    name: 'Mega-Sena Principal',
-                    description: 'Template principal para resultados da Mega-Sena',
-                    image_url: '/megasena-template.png',
-                    lottery_type: 'mega-sena',
-                    status: 'active',
-                    usage_count: 1247,
-                    usage_today: 15,
-                    current_avg_time: 2.3,
-                    created_at: new Date().toISOString()
-                },
-                {
-                    id: '550e8400-e29b-41d4-a716-446655440002',
-                    name: 'Lotofácil Resultados',
-                    description: 'Template para sorteios da Lotofácil',
-                    image_url: '/lotofacil-template.png',
-                    lottery_type: 'lotofacil',
-                    status: 'inactive',
-                    usage_count: 856,
-                    usage_today: 8,
-                    current_avg_time: 1.8,
-                    created_at: new Date().toISOString()
-                }
-            ],
-            total: 3,
-            status: 'active'
-        })
+        return NextResponse.json(
+            { error: 'Erro ao buscar templates' },
+            { status: 500 }
+        )
     }
 }
 
 export async function POST(request: NextRequest) {
     try {
-        const formData = await request.formData()
-        const name = formData.get('name') as string
-        const description = formData.get('description') as string
-        const lotteryType = formData.get('lottery_type') as string
-        const imageFile = formData.get('image') as File
+        const body = await request.json()
+        const { name, description, lottery_type, width = 1080, height = 1920 } = body
 
-        if (!name || !imageFile) {
+        if (!name) {
             return NextResponse.json(
-                { error: 'Nome e imagem são obrigatórios' },
+                { error: 'Nome é obrigatório' },
                 { status: 400 }
             )
         }
 
-        // Criar diretório de uploads se não existir
-        const uploadsDir = join(process.cwd(), 'public', 'uploads', 'templates')
-        if (!existsSync(uploadsDir)) {
-            await mkdir(uploadsDir, { recursive: true })
-        }
-
-        // Gerar nome único para o arquivo
-        const fileExtension = imageFile.name.split('.').pop()
-        const fileName = `${uuidv4()}.${fileExtension}`
-        const filePath = join(uploadsDir, fileName)
-
-        // Salvar arquivo no servidor
-        const bytes = await imageFile.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        await writeFile(filePath, buffer)
-
-        // Criar template no banco de dados
-        const imageUrl = `/uploads/templates/${fileName}`
-        const templateId = uuidv4()
-
-        const template = {
-            id: templateId,
+        // Criar template
+        const template = await dbHelpers.createTemplate({
             name,
-            description: description || '',
-            image_url: imageUrl,
-            image_key: fileName,
-            lottery_type: lotteryType || null,
-            status: 'active',
-            usage_count: 0,
-            usage_today: 0,
-            current_avg_time: null,
-            created_at: new Date().toISOString()
-        }
+            description: description || null,
+            lottery_type: lottery_type || null,
+            status: 'draft'
+        })
 
-        // Tentar salvar no banco de dados
-        try {
-            await dbHelpers.createTemplate(template)
-        } catch (dbError) {
-            console.error('Erro ao salvar template no banco:', dbError)
-            // Se der erro no banco, ainda assim retornamos sucesso pois o arquivo foi salvo
-            // O template pode ser recriado depois se necessário
-        }
+        // Criar primeiro canvas automaticamente
+        const canvas = await dbHelpers.createCanvas({
+            template_id: template.id,
+            name: 'Page 1',
+            width,
+            height,
+            background_color: '#FFFFFF'
+        })
+
+        // Buscar template completo
+        const templateDeep = await dbHelpers.getTemplateDeep(template.id)
 
         return NextResponse.json({
             success: true,
-            template,
+            template: templateDeep,
             message: 'Template criado com sucesso!'
-        })
+        }, { status: 201 })
 
     } catch (error) {
         console.error('Erro ao criar template:', error)
         return NextResponse.json(
-            { error: 'Erro interno do servidor' },
+            { error: 'Erro ao criar template' },
             { status: 500 }
         )
     }

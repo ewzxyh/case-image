@@ -9,7 +9,9 @@ import {
     HelpCircle,
     Moon,
     Sun,
-    Monitor
+    Monitor,
+    Layers,
+    Image as ImageIcon
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -40,17 +42,17 @@ const items = [
         icon: Home,
     },
     {
-        title: "Templates",
+        title: "Image Templates",
         url: "/templates",
-        icon: FileImage,
+        icon: Layers,
     },
     {
-        title: "Editor",
-        url: "/editor",
-        icon: Edit,
+        title: "Media Library",
+        url: "/media",
+        icon: ImageIcon,
     },
     {
-        title: "Galeria",
+        title: "Generated Images",
         url: "/galeria",
         icon: GalleryHorizontalEnd,
     },
