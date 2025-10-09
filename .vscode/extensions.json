@@ -13,8 +13,5 @@
     "unifiedjs.vscode-mdx",
     "ms-vscode.vscode-markdown-notebook"
   ],
-  "unwantedRecommendations": [
-    "ms-vscode.vscode-typescript",
-    "hookyqr.beautify"
-  ]
+  "unwantedRecommendations": ["ms-vscode.vscode-typescript", "hookyqr.beautify"]
 }

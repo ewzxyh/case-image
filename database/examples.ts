@@ -2,8 +2,7 @@
 // Exemplos de uso do banco de dados
 // =================================================
 
-import { sql, dbHelpers } from '@/lib/database'
-import type { Template, GeneratedImage } from '@/lib/database'
+import { dbHelpers, sql } from "@/lib/database";
 
 // =================================================
 // EXEMPLOS DE QUERIES BÁSICAS
@@ -11,48 +10,49 @@ import type { Template, GeneratedImage } from '@/lib/database'
 
 // 1. Buscar todos os templates ativos
 export async function getActiveTemplates() {
-    const templates = await sql`
+  const templates = await sql`
     SELECT * FROM templates
     WHERE status = 'active'
     ORDER BY usage_count DESC
-  `
-    return templates
+  `;
+  return templates;
 }
 
 // 2. Buscar template com todos os placeholders
 export async function getTemplateWithPlaceholders(templateId: string) {
-    const templateWithPlaceholders = await dbHelpers.getTemplateWithPlaceholders(templateId)
-    return templateWithPlaceholders
+  const templateWithPlaceholders =
+    await dbHelpers.getTemplateWithPlaceholders(templateId);
+  return templateWithPlaceholders;
 }
 
 // 3. Criar um novo template
 export async function createTemplate(templateData: {
-    name: string
-    description?: string
-    image_url: string
-    lottery_type: string
-    user_id: string
+  name: string;
+  description?: string;
+  image_url: string;
+  lottery_type: string;
+  user_id: string;
 }) {
-    const [newTemplate] = await sql`
+  const [newTemplate] = await sql`
     INSERT INTO templates (name, description, image_url, lottery_type, created_by)
     VALUES (${templateData.name}, ${templateData.description}, ${templateData.image_url}, ${templateData.lottery_type}, ${templateData.user_id})
     RETURNING *
-  `
-    return newTemplate
+  `;
+  return newTemplate;
 }
 
 // 4. Adicionar placeholder a um template
 export async function addPlaceholder(placeholderData: {
-    template_id: string
-    name: string
-    x_position: number
-    y_position: number
-    width: number
-    height: number
-    font_size?: number
-    font_color?: string
+  template_id: string;
+  name: string;
+  x_position: number;
+  y_position: number;
+  width: number;
+  height: number;
+  font_size?: number;
+  font_color?: string;
 }) {
-    const [newPlaceholder] = await sql`
+  const [newPlaceholder] = await sql`
     INSERT INTO template_placeholders (
       template_id, name, x_position, y_position, width, height,
       font_size, font_color
@@ -60,11 +60,11 @@ export async function addPlaceholder(placeholderData: {
       ${placeholderData.template_id}, ${placeholderData.name},
       ${placeholderData.x_position}, ${placeholderData.y_position},
       ${placeholderData.width}, ${placeholderData.height},
-      ${placeholderData.font_size || 24}, ${placeholderData.font_color || '#000000'}
+      ${placeholderData.font_size || 24}, ${placeholderData.font_color || "#000000"}
     )
     RETURNING *
-  `
-    return newPlaceholder
+  `;
+  return newPlaceholder;
 }
 
 // =================================================
@@ -73,19 +73,19 @@ export async function addPlaceholder(placeholderData: {
 
 // 5. Buscar estatísticas para o dashboard
 export async function getDashboardData() {
-    const stats = await dbHelpers.getDashboardStats()
+  const stats = await dbHelpers.getDashboardStats();
 
-    // Buscar templates recentes
-    const recentTemplates = await sql`
+  // Buscar templates recentes
+  const recentTemplates = await sql`
     SELECT id, name, created_at, usage_count
     FROM templates
     WHERE status = 'active'
     ORDER BY created_at DESC
     LIMIT 5
-  `
+  `;
 
-    // Buscar atividades recentes
-    const recentActivities = await sql`
+  // Buscar atividades recentes
+  const recentActivities = await sql`
     SELECT
       gi.created_at,
       t.name as template_name,
@@ -94,13 +94,13 @@ export async function getDashboardData() {
     JOIN templates t ON gi.template_id = t.id
     ORDER BY gi.created_at DESC
     LIMIT 10
-  `
+  `;
 
-    return {
-        stats,
-        recentTemplates,
-        recentActivities
-    }
+  return {
+    stats,
+    recentTemplates,
+    recentActivities,
+  };
 }
 
 // =================================================
@@ -109,14 +109,14 @@ export async function getDashboardData() {
 
 // 6. Registrar uma imagem gerada
 export async function saveGeneratedImage(imageData: {
-    template_id: string
-    image_url: string
-    generation_time: number
-    user_id?: string
-    lottery_draw_id?: string
+  template_id: string;
+  image_url: string;
+  generation_time: number;
+  user_id?: string;
+  lottery_draw_id?: string;
 }) {
-    // Inserir imagem gerada
-    const [newImage] = await sql`
+  // Inserir imagem gerada
+  const [newImage] = await sql`
     INSERT INTO generated_images (
       template_id, image_url, generation_time,
       created_by, lottery_draw_id
@@ -126,12 +126,15 @@ export async function saveGeneratedImage(imageData: {
       ${imageData.lottery_draw_id}
     )
     RETURNING *
-  `
+  `;
 
-    // Registrar uso do template
-    await dbHelpers.recordTemplateUsage(imageData.template_id, imageData.generation_time)
+  // Registrar uso do template
+  await dbHelpers.recordTemplateUsage(
+    imageData.template_id,
+    imageData.generation_time
+  );
 
-    return newImage
+  return newImage;
 }
 
 // =================================================
@@ -140,19 +143,19 @@ export async function saveGeneratedImage(imageData: {
 
 // 7. Buscar último sorteio de uma loteria
 export async function getLatestLotteryDraw(lotteryType: string) {
-    const draw = await dbHelpers.getLatestDraw(lotteryType)
-    return draw
+  const draw = await dbHelpers.getLatestDraw(lotteryType);
+  return draw;
 }
 
 // 8. Salvar novo sorteio
 export async function saveLotteryDraw(drawData: {
-    lottery_type: string
-    draw_number: number
-    draw_date: string
-    result_data: any
-    prize_value?: number
+  lottery_type: string;
+  draw_number: number;
+  draw_date: string;
+  result_data: any;
+  prize_value?: number;
 }) {
-    const [newDraw] = await sql`
+  const [newDraw] = await sql`
     INSERT INTO lottery_draws (
       lottery_type, draw_number, draw_date,
       result_data, prize_value
@@ -162,8 +165,8 @@ export async function saveLotteryDraw(drawData: {
       ${drawData.prize_value}
     )
     RETURNING *
-  `
-    return newDraw
+  `;
+  return newDraw;
 }
 
 // =================================================
@@ -172,20 +175,20 @@ export async function saveLotteryDraw(drawData: {
 
 // 9. Buscar usuário por email
 export async function getUserByEmail(email: string) {
-    const [user] = await sql`
+  const [user] = await sql`
     SELECT * FROM users
     WHERE email = ${email}
-  `
-    return user
+  `;
+  return user;
 }
 
 // 10. Atualizar último login do usuário
 export async function updateUserLastLogin(userId: string) {
-    await sql`
+  await sql`
     UPDATE users
     SET last_login_at = NOW()
     WHERE id = ${userId}
-  `
+  `;
 }
 
 // =================================================
@@ -194,7 +197,7 @@ export async function updateUserLastLogin(userId: string) {
 
 // 11. Buscar estatísticas de um template específico
 export async function getTemplateStats(templateId: string) {
-    const [stats] = await sql`
+  const [stats] = await sql`
     SELECT
       t.name,
       t.usage_count as total_usage,
@@ -206,13 +209,13 @@ export async function getTemplateStats(templateId: string) {
       AND DATE(gi.created_at) = CURRENT_DATE
     WHERE t.id = ${templateId}
     GROUP BY t.id, t.name, t.usage_count, t.average_generation_time
-  `
-    return stats
+  `;
+  return stats;
 }
 
 // 12. Buscar templates mais usados na semana
 export async function getTopTemplatesThisWeek() {
-    const templates = await sql`
+  const templates = await sql`
     SELECT
       t.id,
       t.name,
@@ -225,8 +228,8 @@ export async function getTopTemplatesThisWeek() {
     GROUP BY t.id, t.name
     ORDER BY weekly_usage DESC
     LIMIT 10
-  `
-    return templates
+  `;
+  return templates;
 }
 
 // =================================================
@@ -235,21 +238,21 @@ export async function getTopTemplatesThisWeek() {
 
 // 13. Limpar imagens antigas (mais de 30 dias)
 export async function cleanupOldImages(daysOld = 30) {
-    const deletedImages = await sql`
+  const deletedImages = await sql`
     DELETE FROM generated_images
     WHERE created_at < CURRENT_DATE - INTERVAL '${daysOld} days'
     RETURNING id, image_url
-  `
-    return deletedImages
+  `;
+  return deletedImages;
 }
 
 // 14. Resetar estatísticas diárias (para testes)
 export async function resetDailyStats() {
-    await sql`
+  await sql`
     UPDATE template_usage_stats
     SET usage_count = 0, total_generation_time = 0, average_generation_time = 0
     WHERE date < CURRENT_DATE
-  `
+  `;
 }
 
 // =================================================
@@ -258,15 +261,15 @@ export async function resetDailyStats() {
 
 // 15. Buscar templates com filtros avançados
 export async function searchTemplates(filters: {
-    lottery_type?: string
-    status?: string
-    is_public?: boolean
-    created_by?: string
-    search_term?: string
-    limit?: number
-    offset?: number
+  lottery_type?: string;
+  status?: string;
+  is_public?: boolean;
+  created_by?: string;
+  search_term?: string;
+  limit?: number;
+  offset?: number;
 }) {
-    let query = sql`
+  let query = sql`
     SELECT
       t.*,
       u.name as creator_name,
@@ -274,36 +277,36 @@ export async function searchTemplates(filters: {
     FROM templates t
     LEFT JOIN users u ON t.created_by = u.id
     LEFT JOIN generated_images gi ON t.id = gi.template_id
-  `
+  `;
 
-    const conditions = []
+  const conditions = [];
 
-    if (filters.lottery_type) {
-        conditions.push(sql`AND t.lottery_type = ${filters.lottery_type}`)
-    }
+  if (filters.lottery_type) {
+    conditions.push(sql`AND t.lottery_type = ${filters.lottery_type}`);
+  }
 
-    if (filters.status) {
-        conditions.push(sql`AND t.status = ${filters.status}`)
-    }
+  if (filters.status) {
+    conditions.push(sql`AND t.status = ${filters.status}`);
+  }
 
-    if (filters.is_public !== undefined) {
-        conditions.push(sql`AND t.is_public = ${filters.is_public}`)
-    }
+  if (filters.is_public !== undefined) {
+    conditions.push(sql`AND t.is_public = ${filters.is_public}`);
+  }
 
-    if (filters.created_by) {
-        conditions.push(sql`AND t.created_by = ${filters.created_by}`)
-    }
+  if (filters.created_by) {
+    conditions.push(sql`AND t.created_by = ${filters.created_by}`);
+  }
 
-    if (filters.search_term) {
-        conditions.push(sql`
+  if (filters.search_term) {
+    conditions.push(sql`
       AND (
         t.name ILIKE ${`%${filters.search_term}%`} OR
         t.description ILIKE ${`%${filters.search_term}%`}
       )
-    `)
-    }
+    `);
+  }
 
-    query = sql`
+  query = sql`
     ${query}
     WHERE 1=1
     ${conditions}
@@ -311,10 +314,10 @@ export async function searchTemplates(filters: {
     ORDER BY t.created_at DESC
     LIMIT ${filters.limit || 20}
     OFFSET ${filters.offset || 0}
-  `
+  `;
 
-    const templates = await query
-    return templates
+  const templates = await query;
+  return templates;
 }
 
 // =================================================
@@ -346,19 +349,19 @@ console.log('Imagem gerada com sucesso:', savedImage)
 */
 
 export default {
-    getActiveTemplates,
-    getTemplateWithPlaceholders,
-    createTemplate,
-    addPlaceholder,
-    getDashboardData,
-    saveGeneratedImage,
-    getLatestLotteryDraw,
-    saveLotteryDraw,
-    getUserByEmail,
-    updateUserLastLogin,
-    getTemplateStats,
-    getTopTemplatesThisWeek,
-    cleanupOldImages,
-    resetDailyStats,
-    searchTemplates
-}
+  getActiveTemplates,
+  getTemplateWithPlaceholders,
+  createTemplate,
+  addPlaceholder,
+  getDashboardData,
+  saveGeneratedImage,
+  getLatestLotteryDraw,
+  saveLotteryDraw,
+  getUserByEmail,
+  updateUserLastLogin,
+  getTemplateStats,
+  getTopTemplatesThisWeek,
+  cleanupOldImages,
+  resetDailyStats,
+  searchTemplates,
+};

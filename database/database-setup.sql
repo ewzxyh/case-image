@@ -27,12 +27,13 @@ DROP VIEW IF EXISTS dashboard_stats CASCADE;
 DROP VIEW IF EXISTS templates_with_stats CASCADE;
 
 -- Drop functions
-DROP FUNCTION IF EXISTS update_template_usage(UUID, DECIMAL) CASCADE;
+DROP FUNCTION IF EXISTS update_template_usage(UUID, DECIMAL, UUID) CASCADE;
 DROP FUNCTION IF EXISTS update_users_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS update_templates_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS update_placeholders_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS update_media_assets_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS update_canvases_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS normalize_placeholder_positions() CASCADE;
 
 -- =================================================
 -- EXTENSÕES NECESSÁRIAS
@@ -116,12 +117,23 @@ CREATE TABLE template_placeholders (
     name VARCHAR(255) NOT NULL,
     placeholder_type VARCHAR(50) DEFAULT 'text' CHECK (placeholder_type IN ('text', 'image')),
     
-    -- Posicionamento e dimensões
+    -- Posicionamento e dimensões (pixels)
     x_position INTEGER NOT NULL,
     y_position INTEGER NOT NULL,
     width INTEGER NOT NULL,
     height INTEGER NOT NULL,
     z_index INTEGER DEFAULT 0,
+    
+    -- Posicionamento normalizado (ratios 0-1 relativos ao canvas)
+    x_ratio DECIMAL(6,5) CHECK (x_ratio IS NULL OR (x_ratio >= 0 AND x_ratio <= 1)),
+    y_ratio DECIMAL(6,5) CHECK (y_ratio IS NULL OR (y_ratio >= 0 AND y_ratio <= 1)),
+    width_ratio DECIMAL(6,5) CHECK (width_ratio IS NULL OR (width_ratio >= 0 AND width_ratio <= 1)),
+    height_ratio DECIMAL(6,5) CHECK (height_ratio IS NULL OR (height_ratio >= 0 AND height_ratio <= 1)),
+    
+    -- Âncoras para alinhamento
+    anchor_h VARCHAR(10) DEFAULT 'left' CHECK (anchor_h IN ('left', 'center', 'right')),
+    anchor_v VARCHAR(10) DEFAULT 'top' CHECK (anchor_v IN ('top', 'middle', 'bottom')),
+    is_background BOOLEAN DEFAULT false,
     
     -- Propriedades de texto
     text_content TEXT, -- conteúdo padrão ou placeholder {{VALOR}}
@@ -130,11 +142,12 @@ CREATE TABLE template_placeholders (
     font_color VARCHAR(20) DEFAULT '#000000',
     font_weight VARCHAR(20) DEFAULT 'normal',
     text_align VARCHAR(20) DEFAULT 'left' CHECK (text_align IN ('left', 'center', 'right')),
+    line_height DECIMAL(3,2) DEFAULT 1.2,
     
     -- Propriedades de imagem
     image_asset_id UUID REFERENCES media_assets(id) ON DELETE SET NULL,
     image_url TEXT, -- URL externa alternativa
-    image_position VARCHAR(20) DEFAULT 'cover' CHECK (image_position IN ('cover', 'contain', 'fill', 'align')),
+    image_position VARCHAR(20) DEFAULT 'cover' CHECK (image_position IN ('cover', 'contain', 'fill', 'align', 'crop', 'background')),
     image_align_h VARCHAR(20) DEFAULT 'center' CHECK (image_align_h IN ('left', 'center', 'right', 'full')),
     image_align_v VARCHAR(20) DEFAULT 'center' CHECK (image_align_v IN ('top', 'center', 'bottom', 'full')),
     
@@ -145,6 +158,8 @@ CREATE TABLE template_placeholders (
     border_radius INTEGER DEFAULT 0,
     opacity DECIMAL(3,2) DEFAULT 1.0,
     is_visible BOOLEAN DEFAULT true,
+    is_static BOOLEAN DEFAULT false,
+    hide_if_empty BOOLEAN DEFAULT false,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -245,6 +260,8 @@ CREATE INDEX idx_canvases_order ON template_canvases(template_id, canvas_order);
 -- Índices para placeholders
 CREATE INDEX idx_placeholders_canvas_id ON template_placeholders(canvas_id);
 CREATE INDEX idx_placeholders_type ON template_placeholders(placeholder_type);
+CREATE INDEX idx_placeholders_z_index ON template_placeholders(canvas_id, z_index);
+CREATE INDEX idx_placeholders_background ON template_placeholders(canvas_id, is_background) WHERE is_background = true;
 
 -- Índices para sorteios
 CREATE INDEX idx_lottery_draws_type_number ON lottery_draws(lottery_type, draw_number DESC);
@@ -341,6 +358,76 @@ CREATE TRIGGER trigger_placeholders_updated_at
     BEFORE UPDATE ON template_placeholders
     FOR EACH ROW
     EXECUTE FUNCTION update_placeholders_updated_at();
+
+-- Trigger para normalizar posições (pixels <-> ratios)
+CREATE OR REPLACE FUNCTION normalize_placeholder_positions()
+RETURNS TRIGGER AS $$
+DECLARE
+    canvas_width INTEGER;
+    canvas_height INTEGER;
+BEGIN
+    -- Buscar dimensões do canvas
+    SELECT width, height INTO canvas_width, canvas_height
+    FROM template_canvases
+    WHERE id = NEW.canvas_id;
+
+    -- Se recebeu pixels mas não tem ratios, calcular ratios
+    IF NEW.x_ratio IS NULL AND canvas_width > 0 THEN
+        NEW.x_ratio = LEAST(1.0, GREATEST(0.0, NEW.x_position::DECIMAL / canvas_width));
+    END IF;
+
+    IF NEW.y_ratio IS NULL AND canvas_height > 0 THEN
+        NEW.y_ratio = LEAST(1.0, GREATEST(0.0, NEW.y_position::DECIMAL / canvas_height));
+    END IF;
+
+    IF NEW.width_ratio IS NULL AND canvas_width > 0 THEN
+        NEW.width_ratio = LEAST(1.0, GREATEST(0.0, NEW.width::DECIMAL / canvas_width));
+    END IF;
+
+    IF NEW.height_ratio IS NULL AND canvas_height > 0 THEN
+        NEW.height_ratio = LEAST(1.0, GREATEST(0.0, NEW.height::DECIMAL / canvas_height));
+    END IF;
+
+    -- Se recebeu ratios, recalcular pixels
+    IF NEW.x_ratio IS NOT NULL AND canvas_width > 0 THEN
+        NEW.x_position = ROUND(NEW.x_ratio * canvas_width);
+    END IF;
+
+    IF NEW.y_ratio IS NOT NULL AND canvas_height > 0 THEN
+        NEW.y_position = ROUND(NEW.y_ratio * canvas_height);
+    END IF;
+
+    IF NEW.width_ratio IS NOT NULL AND canvas_width > 0 THEN
+        NEW.width = ROUND(NEW.width_ratio * canvas_width);
+    END IF;
+
+    IF NEW.height_ratio IS NOT NULL AND canvas_height > 0 THEN
+        NEW.height = ROUND(NEW.height_ratio * canvas_height);
+    END IF;
+
+    -- Para background, garantir que cobre todo o canvas
+    IF NEW.is_background = true THEN
+        NEW.x_position = 0;
+        NEW.y_position = 0;
+        NEW.width = canvas_width;
+        NEW.height = canvas_height;
+        NEW.x_ratio = 0;
+        NEW.y_ratio = 0;
+        NEW.width_ratio = 1.0;
+        NEW.height_ratio = 1.0;
+        NEW.anchor_h = 'center';
+        NEW.anchor_v = 'middle';
+        NEW.z_index = LEAST(NEW.z_index, -100); -- Backgrounds vão para trás
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_normalize_placeholder_positions
+    BEFORE INSERT OR UPDATE ON template_placeholders
+    FOR EACH ROW
+    EXECUTE FUNCTION normalize_placeholder_positions();
 
 -- =================================================
 -- DADOS INICIAIS E DE EXEMPLO

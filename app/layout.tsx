@@ -15,7 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Gerador de Imagens de Loteria",
-  description: "Sistema automatizado para geração de imagens para redes sociais baseadas em resultados de loterias",
+  description:
+    "Sistema automatizado para geração de imagens para redes sociais baseadas em resultados de loterias",
 };
 
 export default function RootLayout({
@@ -28,9 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ClientLayout>
-          {children}
-        </ClientLayout>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

@@ -190,6 +190,33 @@ button {
   opacity: 0.8;
 }
 
+/* Canvas wrapper for CSS transform pan/zoom */
+.canvas-wrapper {
+  position: relative;
+  touch-action: none;
+}
+
+.canvas-wrapper .canvas-container {
+  --tOriginX: 0px;
+  --tOriginY: 0px;
+  transform-origin: var(--tOriginX) var(--tOriginY);
+}
+
+/* Debug: visualizar transform-origin (remover em produção) */
+.canvas-wrapper .canvas-container.debug-origin::after {
+  position: absolute;
+  top: var(--tOriginY);
+  left: var(--tOriginX);
+  width: 5px;
+  height: 5px;
+  content: '';
+  background-color: #e60064;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  pointer-events: none;
+}
+
 /* Floating canvas settings */
 .floating-canvas-settings {
   z-index: 1000;
@@ -197,7 +224,14 @@ button {
   width: 280px;
   position: fixed !important;
   pointer-events: auto;
-  transition: left 0.1s ease-out, top 0.1s ease-out;
+}
+
+.canvas-settings-position {
+  left: var(--settings-pos-x, 0);
+  top: var(--settings-pos-y, 0);
+  transition:
+    left 0.1s ease-out,
+    top 0.1s ease-out;
   will-change: left, top;
 }
 
@@ -221,7 +255,8 @@ button {
 }
 
 .floating-canvas-settings:hover > div {
-  box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.1),
+  box-shadow:
+    0 10px 25px -5px rgb(0 0 0 / 0.1),
     0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
